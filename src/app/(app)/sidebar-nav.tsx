@@ -9,21 +9,23 @@ const items = [
   { href: "/landing-pages", label: "Landing pages" },
   { href: "/calendar", label: "Calendar" },
   { href: "/integrations", label: "Integrations" },
+  { href: "/profile", label: "Business profile" },
   { href: "/settings", label: "Settings" },
 ];
 
 export function SidebarNav({
-  isOwner,
+  showSetup,
   isAdmin,
   horizontal = false,
 }: {
-  isOwner: boolean;
+  /** Owners see the setup assistant link until setup is finished (then it lives on Business profile). */
+  showSetup: boolean;
   isAdmin: boolean;
   horizontal?: boolean;
 }) {
   const pathname = usePathname();
   const links = [
-    ...(isOwner ? [{ href: "/setup", label: "Setup assistant" }] : []),
+    ...(showSetup ? [{ href: "/setup", label: "Setup assistant" }] : []),
     ...items,
     ...(isAdmin ? [{ href: "/admin", label: "Admin" }] : []),
   ];

@@ -6,6 +6,7 @@ import { SidebarNav } from "./sidebar-nav";
 export default async function AppLayout({ children }: LayoutProps<"/">) {
   const workspace = await requireWorkspace();
   const profile = await getProfile();
+  const showSetup = workspace.role === "owner" && !workspace.setupCompletedAt;
 
   return (
     <div className="flex min-h-screen">
@@ -13,7 +14,7 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
         <Link href="/dashboard" className="px-5 py-5 text-lg font-semibold text-slate-900">
           LeadGen <span className="text-brand-600">OS</span>
         </Link>
-        <SidebarNav isOwner={workspace.role === "owner"} isAdmin={Boolean(profile?.is_platform_admin)} />
+        <SidebarNav showSetup={showSetup} isAdmin={Boolean(profile?.is_platform_admin)} />
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col">
@@ -32,7 +33,7 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
           </div>
         </header>
         <div className="border-b border-slate-200 bg-white md:hidden">
-          <SidebarNav isOwner={workspace.role === "owner"} isAdmin={Boolean(profile?.is_platform_admin)} horizontal />
+          <SidebarNav showSetup={showSetup} isAdmin={Boolean(profile?.is_platform_admin)} horizontal />
         </div>
         <main className="flex-1 px-4 py-6 md:px-8">{children}</main>
       </div>
