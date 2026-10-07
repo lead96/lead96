@@ -1,10 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { useActionState, useEffect, useRef, useState } from "react";
+import { startTransition, useActionState, useEffect, useRef, useState } from "react";
 import { useFormStatus } from "react-dom";
 import { Alert, Button, Card } from "@/components/ui";
-import { REQUIRED_FIELDS, describeHours, formatUsPhone, type SetupDraft } from "@/lib/setup/draft";
+import { REQUIRED_FIELDS, describeHours, formatUsPhone, parseZips, type SetupDraft } from "@/lib/setup/draft";
 import type { Option } from "@/lib/setup/prompts";
 import { finishSetup, restartSetup, sendSetupMessage, type ChatState } from "./actions";
 
@@ -19,7 +19,11 @@ function fieldValue(key: string, d: SetupDraft, o: { services: Option[]; custome
     case "services": return labelsFor(d.services, o.services);
     case "lead_types": return d.lead_types.map((t) => LEAD_TYPE_LABELS[t]).join(" + ");
     case "customer_types": return labelsFor(d.customer_types, o.customerTypes);
-    case "zip_codes": return d.zip_codes.length > 6 ? `${d.zip_codes.slice(0, 6).join(", ")} +${d.zip_codes.length - 6} more` : d.zip_codes.join(", ");
+    case "zip_codes": {
+      if (!d.zip_codes.length) return "";
+      const list = d.zip_codes.length > 6 ? `${d.zip_codes.slice(0, 6).join(", ")} +${d.zip_codes.length - 6} more` : d.zip_codes.join(", ");
+      return d.area_description ? `${d.area_description} (${d.zip_codes.length} ZIPs: ${list})` : list;
+    }
     case "booking_hours": return describeHours(d.booking_hours);
     case "capacity_per_day": return d.capacity_per_day === null ? "" : `${d.capacity_per_day} per day`;
     case "monthly_budget": return d.monthly_budget === null ? "" : `$${d.monthly_budget.toLocaleString("en-US")} / month`;
@@ -33,34 +37,59 @@ function fieldValue(key: string, d: SetupDraft, o: { services: Option[]; custome
 export function SetupChat({
   initial,
   options,
-  defaultQuestions,
   suggestion,
   hasConversation,
 }: {
   initial: ChatState;
   options: { services: Option[]; customerTypes: Option[] };
-  defaultQuestions: string[];
   suggestion: string;
   hasConversation: boolean;
 }) {
-  const [state, action, pending] = useActionState(sendSetupMessage, initial);
+  const [state, dispatch, pending] = useActionState(sendSetupMessage, initial);
   const [input, setInput] = useState(suggestion);
   const [sent, setSent] = useState("");
+  const [picked, setPicked] = useState<string[]>([]);
+  const [fileError, setFileError] = useState("");
   const bottomRef = useRef<HTMLDivElement>(null);
-  const formRef = useRef<HTMLFormElement>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
 
-  // After an error, give the owner back what they typed (adjusting state during render, not in an effect).
+  // After each reply: restore unsent text after an error, clear button picks (render-time state adjust).
   const [seenState, setSeenState] = useState(state);
   if (state !== seenState) {
     setSeenState(state);
+    setPicked([]);
     if (state.unsent) setInput(state.unsent);
   }
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
   }, [state.messages.length, pending]);
 
+  const send = (text: string) => {
+    const t = text.trim();
+    if (!t || pending) return;
+    const data = new FormData();
+    data.set("message", t);
+    setSent(t);
+    setInput("");
+    setFileError("");
+    startTransition(() => dispatch(data));
+  };
+
+  const onFile = async (file: File | undefined) => {
+    if (!file) return;
+    const zips = parseZips(await file.text());
+    if (zips.length === 0) {
+      setFileError("No 5-digit ZIP codes found in that file.");
+      return;
+    }
+    send(`ZIP codes: ${zips.join(", ")}`);
+  };
+
   const done = state.missing.length === 0;
   const started = hasConversation || state.messages.length > 1;
+  const last = state.messages.at(-1);
+  const chips = !pending && last?.role === "assistant" ? (last.options ?? []) : [];
+  const multi = Boolean(last?.allow_multiple);
 
   return (
     <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
@@ -85,21 +114,45 @@ export function SetupChat({
               <p className="text-sm text-slate-400">Assistant is typing…</p>
             </>
           ) : null}
+
+          {chips.length > 0 ? (
+            <div className="flex flex-wrap gap-2 pt-1" role="group" aria-label="Answer options">
+              {chips.map((label) => {
+                const on = picked.includes(label);
+                return (
+                  <button
+                    key={label}
+                    type="button"
+                    onClick={() => (multi ? setPicked((p) => (on ? p.filter((x) => x !== label) : [...p, label])) : send(label))}
+                    aria-pressed={multi ? on : undefined}
+                    className={`rounded-full border px-3 py-1.5 text-sm transition-colors ${
+                      on ? "border-brand-600 bg-brand-600 text-white" : "border-brand-200 bg-white text-brand-700 hover:bg-brand-50"
+                    }`}
+                  >
+                    {label}
+                  </button>
+                );
+              })}
+              {multi ? (
+                <Button type="button" onClick={() => send(picked.join(", "))} disabled={picked.length === 0} className="rounded-full px-4 py-1.5">
+                  Continue{picked.length ? ` (${picked.length})` : ""}
+                </Button>
+              ) : null}
+            </div>
+          ) : null}
           <div ref={bottomRef} />
         </div>
 
         <div className="border-t border-slate-200 p-3 sm:p-4">
-          {state.error ? (
+          {state.error || fileError ? (
             <div className="mb-3">
-              <Alert tone="error">{state.error}</Alert>
+              <Alert tone="error">{state.error || fileError}</Alert>
             </div>
           ) : null}
           <form
-            ref={formRef}
-            action={action}
-            onSubmit={() => {
-              setSent(input.trim());
-              setInput("");
+            onSubmit={(e) => {
+              e.preventDefault();
+              send(input);
             }}
             className="flex gap-2"
           >
@@ -110,12 +163,12 @@ export function SetupChat({
               onKeyDown={(e) => {
                 if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
                   e.preventDefault();
-                  if (input.trim() && !pending) formRef.current?.requestSubmit();
+                  send(input);
                 }
               }}
               rows={2}
-              maxLength={800}
-              placeholder={done ? "Anything else to change? Or press Save setup." : "Type your answer…"}
+              maxLength={20000}
+              placeholder={done ? "Anything else to change? Or press Save setup." : chips.length ? "Pick an option above, or type your answer…" : "Type your answer…"}
               aria-label="Your message"
               className="block min-h-[44px] w-full resize-none rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-600/20"
             />
@@ -126,6 +179,10 @@ export function SetupChat({
           <div className="mt-2 flex flex-wrap justify-between gap-2 text-xs text-slate-500">
             <span>Enter to send · Shift+Enter for a new line</span>
             <span className="flex gap-3">
+              <input ref={fileRef} type="file" accept=".csv,.txt,.tsv" className="hidden" onChange={(e) => onFile(e.target.files?.[0])} />
+              <button type="button" onClick={() => fileRef.current?.click()} disabled={pending} className="hover:underline">
+                Upload ZIP list
+              </button>
               <Link href="/profile" className="hover:underline">
                 Prefer a form?
               </Link>
@@ -180,16 +237,7 @@ export function SetupChat({
               <SaveButton />
             </form>
           </Card>
-        ) : (
-          <details className="rounded-lg border border-slate-200 bg-white p-4 text-sm text-slate-600">
-            <summary className="cursor-pointer font-medium text-slate-700">Questions our AI asks callers</summary>
-            <ul className="mt-2 list-disc space-y-1 pl-4">
-              {defaultQuestions.map((q) => (
-                <li key={q}>{q}</li>
-              ))}
-            </ul>
-          </details>
-        )}
+        ) : null}
       </div>
     </div>
   );

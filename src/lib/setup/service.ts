@@ -12,8 +12,29 @@ import {
 } from "./draft";
 import { buildPlan, type PlanModelOutput } from "./plan";
 import { PLAN_PROMPT_VERSION, planSchema, planSystemPrompt, type SetupContext } from "./prompts";
+import { greetingPrompt, type ChatPrompt } from "./questions";
 
-export type ChatMessage = { role: "user" | "assistant"; content: string; at: string };
+export type ChatMessage = {
+  role: "user" | "assistant";
+  content: string;
+  at: string;
+  /** Answer buttons shown under an assistant message. */
+  options?: string[];
+  allow_multiple?: boolean;
+  /** The question the owner is answering, when the displayed text is a note/clarification instead. */
+  question?: string;
+};
+
+export function promptToMessage(p: ChatPrompt, question?: string): ChatMessage {
+  return {
+    role: "assistant",
+    content: p.text,
+    at: new Date().toISOString(),
+    ...(p.options && { options: p.options }),
+    ...(p.allow_multiple && { allow_multiple: true }),
+    ...(question && question !== p.text && { question }),
+  };
+}
 export type Conversation = {
   id: string;
   messages: ChatMessage[];
@@ -70,14 +91,8 @@ export async function getActiveConversation(supabase: SupabaseClient, workspaceI
   return data as Conversation | null;
 }
 
-export function greeting(businessName: string, isUpdate: boolean) {
-  return isUpdate
-    ? `Hi again! What would you like to change for ${businessName}? For example your services, service area, hours, budget or the questions our AI asks callers.`
-    : `Hi! I'll help set up ${businessName} so our AI can call and book your leads. It takes about 3 minutes. First: which jobs do you want — repairs, replacements, new installations, maintenance, or something else?`;
-}
-
 /** Start a chat. If setup was saved before, the chat starts from the saved values. */
-export async function startConversation(supabase: SupabaseClient, workspace: WorkspaceContext, userId: string) {
+export async function startConversation(supabase: SupabaseClient, workspace: WorkspaceContext, userId: string, ctx: SetupContext) {
   const isUpdate = Boolean(workspace.setupCompletedAt);
   const { profile, agent } = await loadSaved(supabase, workspace.id);
   const draft = isUpdate ? draftFromSaved(profile, agent) : draftFromSaved(null, null);
@@ -87,7 +102,7 @@ export async function startConversation(supabase: SupabaseClient, workspace: Wor
       workspace_id: workspace.id,
       created_by: userId,
       extracted: draft,
-      messages: [{ role: "assistant", content: greeting(workspace.name, isUpdate), at: new Date().toISOString() }],
+      messages: [promptToMessage(greetingPrompt(ctx, isUpdate, draft))],
     })
     .select("id, messages, extracted, status, total_tokens, user_turns")
     .single();

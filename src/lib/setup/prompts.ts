@@ -4,7 +4,7 @@
  */
 import { LEAD_TYPES, REQUIRED_FIELDS, WEEKDAYS, missingFields, type SetupDraft } from "./draft";
 
-export const SETUP_PROMPT_VERSION = "setup-chat@2";
+export const SETUP_PROMPT_VERSION = "setup-chat@3";
 export const PLAN_PROMPT_VERSION = "campaign-plan@1";
 
 export type Option = { value: string; label: string };
@@ -22,9 +22,17 @@ export function setupTurnSchema(ctx: SetupContext) {
   return {
     type: "object",
     additionalProperties: false,
-    required: ["reply", "updates"],
+    required: ["reply", "understood", "updates", "area_lookup"],
     properties: {
-      reply: { type: "string", description: "Next message to the business owner." },
+      reply: {
+        type: "string",
+        description:
+          "If understood: a 3–10 word acknowledgement of what you took from the message. If not understood: one short clarifying question or a one-sentence answer (≤ 30 words).",
+      },
+      understood: {
+        type: "boolean",
+        description: "true if the owner's latest message answered the pending question or gave other setup facts.",
+      },
       updates: {
         type: "object",
         additionalProperties: false,
@@ -59,36 +67,55 @@ export function setupTurnSchema(ctx: SetupContext) {
           notes: nullable({ type: "string" }),
         },
       },
+      area_lookup: nullable({
+        type: "object",
+        additionalProperties: false,
+        description: "Set when the owner describes their service area by place instead of ZIP codes. The app looks up the ZIPs.",
+        required: ["city", "state", "center_zip", "radius_miles"],
+        properties: {
+          city: nullable({ type: "string" }),
+          state: nullable({ type: "string", description: "2-letter US state code, if known or stated" }),
+          center_zip: nullable({ type: "string", description: "A ZIP the owner gave as the centre of their area" }),
+          radius_miles: nullable({ type: "number", description: "Travel radius in miles, only if stated" }),
+        },
+      }),
     },
   } as const;
 }
 
-export function setupSystemPrompt(ctx: SetupContext, draft: SetupDraft, rejected: string[]) {
+export type ChatPromptForModel = { text: string; options?: string[] };
+
+/**
+ * The model does not run the conversation; the app asks the questions (see questions.ts).
+ * The model turns the owner's latest message into structured updates.
+ */
+export function setupSystemPrompt(ctx: SetupContext, draft: SetupDraft, pending: ChatPromptForModel) {
+  const opts = (o: Option[]) => o.map((x) => `"${x.label}" → ${x.value}`).join(", ");
   const missing = missingFields(draft);
   const label = (key: string) => REQUIRED_FIELDS.find((f) => f.key === key)?.label ?? key;
-  const opts = (o: Option[]) => o.map((x) => `${x.value} (${x.label})`).join(", ");
 
-  return `You are the setup assistant of Lead96. You help "${ctx.businessName}", a US HVAC contractor, describe the jobs they want so our AI can call and book their leads. The owner is not an advertising expert: use plain, friendly English, no marketing jargon.
+  return `You interpret answers in the setup chat of Lead96 for "${ctx.businessName}", a US HVAC contractor. The app asks the questions and shows answer buttons; you turn the owner's LATEST message into structured updates. Plain English, no marketing talk.
 
-How to behave:
-- Ask ONE short question at a time (max ~60 words per reply). Offer examples or choices when useful.
-- Collect missing information in this order: ${missing.length ? missing.map(label).join(" → ") : "(nothing missing)"}.
-- Put ONLY facts the owner stated in "updates". Never guess or invent values. Use null for anything not mentioned in their latest message.
-- ZIP codes: only ZIPs the owner typed. If they name a city or area, ask them to list the ZIP codes they serve. Never generate ZIP codes yourself.
-- Hours: convert to 24h HH:MM per weekday (e.g. "weekdays 8 to 5" → mon–fri 08:00–17:00).
-- Budget is per month in USD. If they give a daily or weekly amount, ask them to confirm the monthly total.
-- Lists replace the previous list, so when the owner adds to a list, send the full new list.
-- Services allowed: ${opts(ctx.services)}. Customer types allowed: ${opts(ctx.customerTypes)}. Lead types: form (web form leads), call (phone calls).
-- AI call questions: the AI caller already asks these defaults: ${ctx.defaultQuestions.map((q) => `"${q}"`).join("; ")}. Show them briefly and ask if the owner wants to add any of their own. In the SAME turn the owner answers (yes/no/"fine"/"looks good", or gives extra questions), set questions_confirmed=true and put any added questions in extra_questions.
-- transfer_phone: the number our AI transfers live calls to when a caller asks for a person. It must be a US number with area code.
-- Ask ONLY for the missing items listed above. Do not ask for anything else (appointment length, target cost, etc.); record them only if the owner mentions them.
-- Never say a value was "saved" — the app checks every value and tells the owner if something is wrong.
-- Do not promise results, lead volumes, prices or ad performance. Do not discuss anything unrelated to setting up the business; steer back politely.
-- When nothing is missing, give a 1–2 sentence wrap-up and tell the owner to check the summary and press "Save setup" below. Do not list every field again.
+The question the owner is answering: "${pending.text.replace(/\s+/g, " ")}"${pending.options?.length ? `
+Buttons shown: ${pending.options.map((o) => `"${o}"`).join(", ")}` : ""}
+Still missing: ${missing.length ? missing.map(label).join(", ") : "nothing"}.
 
-What we already know (JSON):
-${JSON.stringify(draft)}
-${rejected.length ? `\nThese values from the owner's last message were invalid and NOT saved. Briefly ask again:\n- ${rejected.join("\n- ")}` : ""}`;
+Rules:
+- "updates" holds ONLY facts stated in the latest message. null = no change. A list replaces the whole previous list, so when the owner adds to a list, send the full new list.
+- Never guess or invent values. Never generate ZIP codes.
+- Button labels map to values. Services: ${opts(ctx.services)}. Customer types: ${opts(ctx.customerTypes)}. Lead types: "Phone calls" → ["call"], "Web forms" → ["form"], "Both" → ["form","call"].
+- "All" / "everything" / "All services" / "All customers" means every allowed value of that list.
+- Hours: "Mon–Fri 8am–5pm" → mon,tue,wed,thu,fri 08:00–17:00; "Mon–Sat 8am–6pm" → mon–sat 08:00–18:00; "Every day 7am–7pm" → all 7 days 07:00–19:00. Free-text hours → 24h HH:MM per weekday. "Other hours" alone → understood=false, ask for their days and times.
+- Capacity: "10+" → 10. Budget: "$2,000" → 2000, monthly USD; daily/weekly amounts → understood=false, ask for the monthly total. "Other amount" alone → understood=false, ask for the amount.
+- Service area: ZIP codes typed by the owner → zip_codes. A city, town, county, area, "around X" or "X, N miles" → fill area_lookup (city; 2-letter state if stated or obvious; radius_miles only if stated; center_zip if a ZIP was given as the centre) and leave zip_codes null. A "City, ST" button → area_lookup with that city and state. Do NOT ask the owner for ZIP codes.
+- The owner may change an earlier answer or answer a different question at any time. Extract whatever they state — e.g. a new city or radius → area_lookup even if the pending question is about hours. When you set area_lookup, zip_codes must be null.
+- transfer_phone: the number as typed.
+- AI call questions: "Looks good" / yes / fine → questions_confirmed=true. "Add a question" alone → understood=false, ask what question to add. A question text → extra_questions (full list incl. earlier ones) and questions_confirmed=true.
+- Change-request buttons in update mode ("Services", "Service area", "Hours", "Capacity or budget", "Transfer phone", "AI call questions") → understood=false; reply asks that one question briefly.
+- Optional facts (appointment length, target cost per appointment) → record only if mentioned; never ask for them.
+- reply: never say "saved", never list ZIP codes, never promise results or lead volumes. Unrelated question → one-sentence answer, then steer back.
+
+Known so far (JSON): ${JSON.stringify(draft)}`;
 }
 
 // ---------------------------------------------------------------------------

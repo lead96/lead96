@@ -211,6 +211,26 @@ describe.skipIf(!configured)("row-level security", () => {
     expect((await admin.from("usage_records").select("id").eq("id", seeded.data!.id)).data).toHaveLength(1);
   });
 
+  it("ZIP lookup: readable by any signed-in user, not writable, and finds real ZIPs", async () => {
+    const miami = await ownerA.client.rpc("zip_city_matches", { p_city: "miami", p_state: "FL" });
+    expect(miami.data).toHaveLength(1);
+    expect(Number(miami.data![0].zip_count)).toBeGreaterThan(50);
+
+    const springfield = await ownerA.client.rpc("zip_city_matches", { p_city: "Springfield", p_state: null });
+    expect(springfield.data!.length).toBeGreaterThan(5); // ambiguous → app asks which state
+
+    const near = await ownerA.client.rpc("zips_within", { p_lat: miami.data![0].lat, p_lng: miami.data![0].lng, p_miles: 5, p_limit: 400 });
+    expect(near.data!.length).toBeGreaterThan(5);
+    expect(near.data!.every((r: { zip: string }) => /^\d{5}$/.test(r.zip))).toBe(true);
+    expect(near.data![0].miles).toBeLessThanOrEqual(near.data!.at(-1)!.miles);
+
+    const anon = createClient(url!, anonKey!, { auth: { persistSession: false } });
+    expect((await anon.from("us_zip_codes").select("zip").limit(1)).data).toEqual([]);
+    expect((await anon.rpc("zips_within", { p_lat: 25.77, p_lng: -80.19, p_miles: 5 })).error).not.toBeNull();
+    const forged = await ownerA.client.from("us_zip_codes").insert({ zip: "00000", city: "X", state: "XX", lat: 0, lng: 0 });
+    expect(forged.error).not.toBeNull();
+  });
+
   // Keep last: removes staffA.
   it("a user with history can be deleted; audit rows remain without the link", async () => {
     const { error } = await admin.auth.admin.deleteUser(staffA.id);

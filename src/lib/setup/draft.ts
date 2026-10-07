@@ -30,6 +30,8 @@ export type SetupDraft = {
   extra_questions: string[];
   questions_confirmed: boolean;
   notes: string | null;
+  /** How the area was described, e.g. "Miami, FL · 15 mi" (display only). */
+  area_description: string | null;
 };
 
 export function emptyDraft(): SetupDraft {
@@ -47,6 +49,7 @@ export function emptyDraft(): SetupDraft {
     extra_questions: [],
     questions_confirmed: false,
     notes: null,
+    area_description: null,
   };
 }
 

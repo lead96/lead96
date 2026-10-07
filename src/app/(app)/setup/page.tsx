@@ -2,7 +2,8 @@ import type { Metadata } from "next";
 import { PageHeader } from "@/components/ui";
 import { getUser, requireOwner } from "@/lib/auth";
 import { draftFromSaved, missingFields } from "@/lib/setup/draft";
-import { getActiveConversation, greeting, loadSaved, loadSetupContext } from "@/lib/setup/service";
+import { greetingPrompt } from "@/lib/setup/questions";
+import { getActiveConversation, loadSaved, loadSetupContext, promptToMessage } from "@/lib/setup/service";
 import { createClient } from "@/lib/supabase/server";
 import { SetupChat } from "./setup-chat";
 
@@ -25,9 +26,7 @@ export default async function SetupPage() {
     const saved = isUpdate ? await loadSaved(supabase, workspace.id) : null;
     draft = draftFromSaved(saved?.profile ?? null, saved?.agent ?? null);
   }
-  const messages = conversation?.messages ?? [
-    { role: "assistant" as const, content: greeting(workspace.name, isUpdate), at: new Date().toISOString() },
-  ];
+  const messages = conversation?.messages ?? [promptToMessage(greetingPrompt(ctx, isUpdate, draft))];
   const intent = user?.user_metadata?.lead_intent;
   const suggestion = !conversation && !isUpdate && typeof intent === "string" ? intent : "";
 
@@ -40,7 +39,6 @@ export default async function SetupPage() {
       <SetupChat
         initial={{ messages, draft, missing: missingFields(draft) }}
         options={{ services: ctx.services, customerTypes: ctx.customerTypes }}
-        defaultQuestions={ctx.defaultQuestions}
         suggestion={suggestion}
         hasConversation={Boolean(conversation)}
       />
