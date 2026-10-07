@@ -42,7 +42,7 @@ Lead96 palette (brand sheet in `public/Logo`): Electric Blue `#3B82F6` (actions,
 
 ### Setup assistant and Business profile
 
-`/setup` is the setup chat (owners). The app asks the questions and shows answer buttons (`src/lib/setup/questions.ts`); the model only interprets the owner's answers into structured updates. It collects the demand profile, AI call settings and creates a campaign plan. `/profile` shows and edits the same data with forms, and regenerates the plan. Every value the model extracts is validated in `src/lib/setup/draft.ts`; plan numbers are computed in `src/lib/setup/plan.ts`. Prompts and JSON schemas are in `src/lib/setup/prompts.ts` — bump the prompt version when changing them. AI calls use `store: false` and are logged per workspace in `usage_records`.
+`/setup` is the setup chat (owners). The app asks the questions and shows answer buttons (`src/lib/setup/questions.ts`); button clicks are mapped in code (no model call, ~1 s); only typed answers go to the model (`OPENAI_CHAT_MODEL`, default `gpt-4.1-nano`, with a compact prompt). The campaign plan uses `OPENAI_MODEL` (`gpt-4.1-mini`). It collects the demand profile, AI call settings and creates a campaign plan. `/profile` shows and edits the same data with forms, and regenerates the plan. Every value the model extracts is validated in `src/lib/setup/draft.ts`; plan numbers are computed in `src/lib/setup/plan.ts`. Prompts and JSON schemas are in `src/lib/setup/prompts.ts` — bump the prompt version when changing them. AI calls use `store: false` and are logged per workspace in `usage_records`.
 
 ### ZIP code data
 

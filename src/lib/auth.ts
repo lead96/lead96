@@ -17,11 +17,23 @@ export type WorkspaceContext = {
   setupCompletedAt: string | null;
 };
 
-/** The signed-in user (verified with Supabase Auth), or null. */
-export const getUser = cache(async () => {
+export type AuthUser = { id: string; email: string | undefined; user_metadata: Record<string, unknown> };
+
+/**
+ * The signed-in user, or null. The project signs tokens with ES256, so getClaims()
+ * verifies the JWT signature locally (cached JWKS) instead of calling Supabase Auth —
+ * one network round trip less on every page and action.
+ */
+export const getUser = cache(async (): Promise<AuthUser | null> => {
   const supabase = await createClient();
-  const { data } = await supabase.auth.getUser();
-  return data.user;
+  const { data } = await supabase.auth.getClaims();
+  const claims = data?.claims;
+  if (!claims?.sub) return null;
+  return {
+    id: claims.sub,
+    email: typeof claims.email === "string" ? claims.email : undefined,
+    user_metadata: (claims.user_metadata as Record<string, unknown> | undefined) ?? {},
+  };
 });
 
 export async function requireUser() {

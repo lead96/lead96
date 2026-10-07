@@ -1,6 +1,7 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { recordAiUsage, structuredCompletion } from "@/lib/ai/openai";
+import { createAdminClient } from "@/lib/supabase/server";
 import type { WorkspaceContext } from "@/lib/auth";
 import {
   draftFromSaved,
@@ -23,6 +24,8 @@ export type ChatMessage = {
   allow_multiple?: boolean;
   /** The question the owner is answering, when the displayed text is a note/clarification instead. */
   question?: string;
+  /** Radius carried while the owner picks which city they meant. */
+  radius_miles?: number;
 };
 
 export function promptToMessage(p: ChatPrompt, question?: string): ChatMessage {
@@ -33,6 +36,7 @@ export function promptToMessage(p: ChatPrompt, question?: string): ChatMessage {
     ...(p.options && { options: p.options }),
     ...(p.allow_multiple && { allow_multiple: true }),
     ...(question && question !== p.text && { question }),
+    ...(p.radius_miles !== undefined && { radius_miles: p.radius_miles }),
   };
 }
 export type Conversation = {
@@ -44,22 +48,41 @@ export type Conversation = {
   user_turns: number;
 };
 
+type Option = { value: string; label: string };
+const TAXONOMY_TTL_MS = 60 * 60 * 1000;
+const taxonomyCache = new Map<string, { at: number; services: Option[]; customerTypes: Option[] }>();
+
+/**
+ * Service / customer-type labels per vertical. Reference data that only changes with a
+ * migration, so it is cached in memory per server instance (read with the service role,
+ * because the cache is shared across users).
+ */
+async function loadTaxonomy(vertical: string) {
+  const hit = taxonomyCache.get(vertical);
+  if (hit && Date.now() - hit.at < TAXONOMY_TTL_MS) return hit;
+  const { data, error } = await createAdminClient()
+    .from("taxonomy_values")
+    .select("category, value, label")
+    .eq("vertical", vertical)
+    .in("category", ["service", "customer_type"])
+    .order("sort");
+  if (error) throw error;
+  const of = (category: string) =>
+    (data ?? []).filter((t) => t.category === category).map((t) => ({ value: t.value as string, label: t.label as string }));
+  const entry = { at: Date.now(), services: of("service"), customerTypes: of("customer_type").filter((c) => c.value !== "unknown") };
+  taxonomyCache.set(vertical, entry);
+  return entry;
+}
+
 export async function loadSetupContext(supabase: SupabaseClient, workspace: WorkspaceContext): Promise<SetupContext> {
-  const [{ data: taxonomy }, { data: agent }] = await Promise.all([
-    supabase
-      .from("taxonomy_values")
-      .select("category, value, label")
-      .eq("vertical", workspace.vertical)
-      .in("category", ["service", "customer_type"])
-      .order("sort"),
+  const [taxonomy, { data: agent }] = await Promise.all([
+    loadTaxonomy(workspace.vertical),
     supabase.from("agent_settings").select("questions").eq("workspace_id", workspace.id).single(),
   ]);
-  const of = (category: string) =>
-    (taxonomy ?? []).filter((t) => t.category === category).map((t) => ({ value: t.value as string, label: t.label as string }));
   return {
     businessName: workspace.name,
-    services: of("service"),
-    customerTypes: of("customer_type").filter((c) => c.value !== "unknown"),
+    services: taxonomy.services,
+    customerTypes: taxonomy.customerTypes,
     defaultQuestions: ((agent?.questions ?? []) as AgentQuestion[])
       .filter((q) => !q.key.startsWith("custom_"))
       .map((q) => q.question),

@@ -27,8 +27,10 @@ export async function structuredCompletion<T>(opts: {
   instructions: string;
   input: Message[];
   maxOutputTokens?: number;
+  /** Defaults to OPENAI_MODEL. */
+  model?: string;
 }): Promise<{ data: T; usage: Usage }> {
-  const model = serverEnv().OPENAI_MODEL;
+  const model = opts.model ?? serverEnv().OPENAI_MODEL;
   let response;
   try {
     response = await getClient().responses.create({

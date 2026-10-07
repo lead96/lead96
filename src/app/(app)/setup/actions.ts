@@ -6,17 +6,21 @@ import { after } from "next/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { AiUnavailableError, recordAiUsage, structuredCompletion } from "@/lib/ai/openai";
 import { requireOwner, requireUser } from "@/lib/auth";
+import { serverEnv } from "@/lib/env";
 import {
   MAX_AREA_ZIPS,
   cityLabel,
   clampRadius,
   describeAreaResult,
   extractZipList,
+  messageMentionsPlace,
+  pickDominantCity,
+  normalizeAreaLookup,
   type AreaLookup,
 } from "@/lib/setup/area";
 import { mergeUpdates, missingFields, type DraftUpdates, type RequiredField, type SetupDraft } from "@/lib/setup/draft";
 import { SETUP_PROMPT_VERSION, setupSystemPrompt, setupTurnSchema } from "@/lib/setup/prompts";
-import { nextQuestion, type ChatPrompt } from "@/lib/setup/questions";
+import { nextQuestion, resolveButtonAnswer, type ChatPrompt } from "@/lib/setup/questions";
 import {
   generateCampaignPlan,
   getActiveConversation,
@@ -41,7 +45,9 @@ const MAX_MESSAGE_CHARS = 800;
 const MAX_ZIP_LIST_CHARS = 20_000;
 const MAX_USER_TURNS = 40;
 const MAX_TOKENS_PER_CONVERSATION = 80_000;
-const HISTORY_MESSAGES = 16;
+/** The model only interprets the latest answer; a little context is enough (and keeps prompts small). */
+const HISTORY_MESSAGES = 4;
+const HISTORY_CHARS = 300;
 
 type ModelTurn = { reply: string; understood: boolean; updates: DraftUpdates; area_lookup: AreaLookup | null };
 
@@ -62,14 +68,16 @@ function rejectionReply(rejected: string[]) {
 }
 
 type AreaResult =
-  | { kind: "ok"; zips: string[]; label: string; miles: number; truncated: boolean }
-  | { kind: "ambiguous"; city: string; choices: string[] }
+  | { kind: "ok"; zips: string[]; label: string; miles: number; truncated: boolean; guessedState?: string }
+  | { kind: "ambiguous"; city: string; choices: string[]; miles: number }
   | { kind: "none"; place: string };
 
 /** Turn "Miami, 20 miles" into real ZIP codes from us_zip_codes. */
-async function resolveArea(supabase: SupabaseClient, lookup: AreaLookup): Promise<AreaResult | null> {
+async function resolveArea(supabase: SupabaseClient, raw: AreaLookup): Promise<AreaResult | null> {
+  const lookup = normalizeAreaLookup(raw);
   const miles = clampRadius(lookup.radius_miles);
   let center: { lat: number; lng: number; label: string } | null = null;
+  let guessedState: string | undefined;
 
   const zip = lookup.center_zip?.match(/\d{5}/)?.[0];
   if (zip) {
@@ -80,10 +88,12 @@ async function resolveArea(supabase: SupabaseClient, lookup: AreaLookup): Promis
     const { data } = await supabase.rpc("zip_city_matches", { p_city: lookup.city, p_state: lookup.state || null });
     const rows = (data ?? []) as { city: string; state: string; zip_count: number; lat: number; lng: number }[];
     if (rows.length === 0) return { kind: "none", place: lookup.state ? cityLabel(lookup.city, lookup.state) : lookup.city };
-    if (rows.length > 1 && !lookup.state) {
-      return { kind: "ambiguous", city: rows[0].city, choices: rows.slice(0, 6).map((r) => cityLabel(r.city, r.state)) };
+    const chosen = lookup.state ? rows[0] : pickDominantCity(rows);
+    if (!chosen) {
+      return { kind: "ambiguous", city: rows[0].city, choices: rows.slice(0, 6).map((r) => cityLabel(r.city, r.state)), miles };
     }
-    center = { lat: rows[0].lat, lng: rows[0].lng, label: cityLabel(rows[0].city, rows[0].state) };
+    center = { lat: chosen.lat, lng: chosen.lng, label: cityLabel(chosen.city, chosen.state) };
+    if (!lookup.state && rows.length > 1) guessedState = chosen.state;
   } else {
     return null;
   }
@@ -91,7 +101,7 @@ async function resolveArea(supabase: SupabaseClient, lookup: AreaLookup): Promis
   const { data, error } = await supabase.rpc("zips_within", { p_lat: center.lat, p_lng: center.lng, p_miles: miles, p_limit: MAX_AREA_ZIPS + 1 });
   if (error) throw error;
   const zips = ((data ?? []) as { zip: string }[]).map((r) => r.zip);
-  return { kind: "ok", zips: zips.slice(0, MAX_AREA_ZIPS), label: center.label, miles, truncated: zips.length > MAX_AREA_ZIPS };
+  return { kind: "ok", zips: zips.slice(0, MAX_AREA_ZIPS), label: center.label, miles, truncated: zips.length > MAX_AREA_ZIPS, guessedState };
 }
 
 export async function sendSetupMessage(prev: ChatState, formData: FormData): Promise<ChatState> {
@@ -120,7 +130,7 @@ export async function sendSetupMessage(prev: ChatState, formData: FormData): Pro
   const last = conversation.messages.at(-1);
   const pending: ChatPrompt =
     last?.role === "assistant"
-      ? { text: last.question ?? last.content, options: last.options, allow_multiple: last.allow_multiple }
+      ? { text: last.question ?? last.content, options: last.options, allow_multiple: last.allow_multiple, radius_miles: last.radius_miles }
       : nextQuestion(conversation.extracted, ctx);
 
   let draft = conversation.extracted;
@@ -131,19 +141,45 @@ export async function sendSetupMessage(prev: ChatState, formData: FormData): Pro
   let turn: ModelTurn | null = null;
   let usage: Awaited<ReturnType<typeof structuredCompletion>>["usage"] | null = null;
 
+  // Shows the result of a place lookup (or asks which city / says it wasn't found).
+  const applyArea = async (lookup: AreaLookup) => {
+    const area = await resolveArea(supabase, lookup);
+    if (area?.kind === "ok") {
+      draft = { ...draft, zip_codes: area.zips, area_description: `${area.label} · ${area.miles} mi` };
+      note = describeAreaResult(area.zips, area.label, area.miles);
+      if (area.truncated) note += ` That's a big area, so I kept the nearest ${MAX_AREA_ZIPS}. Tell me a smaller radius if you like.`;
+      if (area.guessedState) note += ` (If you meant a different state, just tell me, e.g. “${normalizeAreaLookup(lookup).city}, TX”.)`;
+    } else if (area?.kind === "ambiguous") {
+      followUp = { text: `Which ${area.city} do you mean?`, options: area.choices, radius_miles: area.miles };
+    } else if (area?.kind === "none") {
+      followUp = { text: `I couldn't find a place called “${area.place}”. Could you check the spelling, add the state, or paste your ZIP codes?` };
+    }
+  };
+
+  // Fast paths without the model: a pasted ZIP list, or a click on one of the answer buttons.
+  const button = zipList ? null : resolveButtonAnswer(text, pending, ctx, draft);
   if (zipList) {
     ({ draft, rejected } = mergeUpdates(draft, { zip_codes: zipList }, vocab));
     draft.area_description = null;
     ack = `Got it — ${zipList.length} ZIP code${zipList.length === 1 ? "" : "s"}.`;
+  } else if (button?.kind === "updates") {
+    ({ draft, rejected } = mergeUpdates(draft, button.updates, vocab));
+  } else if (button?.kind === "ask") {
+    followUp = button.prompt;
+  } else if (button?.kind === "area") {
+    await applyArea({ city: button.city, state: button.state, center_zip: null, radius_miles: pending.radius_miles ?? null });
   } else {
-    const history = conversation.messages.slice(-HISTORY_MESSAGES).map(({ role, content }) => ({ role, content }));
+    const history = conversation.messages
+      .slice(-HISTORY_MESSAGES)
+      .map(({ role, content }) => ({ role, content: content.length > HISTORY_CHARS ? `${content.slice(0, HISTORY_CHARS)}…` : content }));
     try {
       const result = await structuredCompletion<ModelTurn>({
         name: "setup_turn",
+        model: serverEnv().OPENAI_CHAT_MODEL,
         schema: setupTurnSchema(ctx),
         instructions: setupSystemPrompt(ctx, draft, pending),
         input: [...history, { role: "user", content: text }],
-        maxOutputTokens: 700,
+        maxOutputTokens: 500,
       });
       turn = result.data;
       usage = result.usage;
@@ -156,24 +192,13 @@ export async function sendSetupMessage(prev: ChatState, formData: FormData): Pro
       };
     }
 
-    // A place lookup supersedes whatever the model put in zip_codes (often the place name itself).
+    // Only look up a place the latest message actually names (the model sometimes repeats an
+    // earlier lookup from the history). A lookup supersedes zip_codes (often the place name itself).
+    if (turn.area_lookup && !messageMentionsPlace(text, normalizeAreaLookup(turn.area_lookup))) turn.area_lookup = null;
     if (turn.area_lookup) turn.updates = { ...turn.updates, zip_codes: null };
     ({ draft, rejected } = mergeUpdates(draft, turn.updates, vocab));
     if (turn.updates.zip_codes?.length && draft.zip_codes !== conversation.extracted.zip_codes) draft.area_description = null;
-
-    if (turn.area_lookup) {
-      const area = await resolveArea(supabase, turn.area_lookup);
-      if (area?.kind === "ok") {
-        draft = { ...draft, zip_codes: area.zips, area_description: `${area.label} · ${area.miles} mi` };
-        note = describeAreaResult(area.zips, area.label, area.miles);
-        if (area.truncated) note += ` That's a big area, so I kept the nearest ${MAX_AREA_ZIPS}. Tell me a smaller radius if you like.`;
-      } else if (area?.kind === "ambiguous") {
-        followUp = { text: `Which ${area.city} do you mean?`, options: area.choices };
-      } else if (area?.kind === "none") {
-        followUp = { text: `I couldn't find a place called “${area.place}”. Could you check the spelling, add the state, or paste your ZIP codes?` };
-      }
-    }
-    if (turn.understood && turn.reply.length <= 120) ack = turn.reply.trim();
+    if (turn.area_lookup) await applyArea(turn.area_lookup);
   }
 
   const changed = JSON.stringify(draft) !== JSON.stringify(conversation.extracted);

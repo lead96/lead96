@@ -4,8 +4,7 @@ import { getProfile, requireWorkspace } from "@/lib/auth";
 import { SidebarNav } from "./sidebar-nav";
 
 export default async function AppLayout({ children }: LayoutProps<"/">) {
-  const workspace = await requireWorkspace();
-  const profile = await getProfile();
+  const [workspace, profile] = await Promise.all([requireWorkspace(), getProfile()]);
   const showSetup = workspace.role === "owner" && !workspace.setupCompletedAt;
 
   return (

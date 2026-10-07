@@ -10,8 +10,8 @@
  *   npm run db:push:https            # apply
  *   npm run db:push:https -- --dry-run
  *
- * Needs SUPABASE_ACCESS_TOKEN (personal access token) in .env.local. The project ref
- * comes from SUPABASE_PROJECT_REF or the linked project (supabase/.temp/project-ref).
+ * Needs SUPABASE_ACCESS_TOKEN (personal access token, from the account that owns the project)
+ * in .env.local. The target is the project in NEXT_PUBLIC_SUPABASE_URL.
  */
 import fs from "node:fs";
 import path from "node:path";
@@ -21,11 +21,23 @@ if (fs.existsSync(".env.local")) process.loadEnvFile(".env.local");
 
 const dryRun = process.argv.includes("--dry-run");
 const token = process.env.SUPABASE_ACCESS_TOKEN;
+// Target = the project the app itself uses (NEXT_PUBLIC_SUPABASE_URL), so migrations can never
+// land in a different database than the one the app and tests talk to.
 const refFile = "supabase/.temp/project-ref";
-const ref = process.env.SUPABASE_PROJECT_REF || (fs.existsSync(refFile) ? fs.readFileSync(refFile, "utf8").trim() : "");
+const urlRef = process.env.NEXT_PUBLIC_SUPABASE_URL?.match(/^https:\/\/([a-z0-9]+)\.supabase\.co/)?.[1] ?? "";
+const linkedRef = fs.existsSync(refFile) ? fs.readFileSync(refFile, "utf8").trim() : "";
+const ref = process.env.SUPABASE_PROJECT_REF || urlRef;
 if (!token || !ref) {
-  console.error("Set SUPABASE_ACCESS_TOKEN in .env.local and link the project (or set SUPABASE_PROJECT_REF).");
+  console.error("Set SUPABASE_ACCESS_TOKEN and NEXT_PUBLIC_SUPABASE_URL in .env.local (or SUPABASE_PROJECT_REF).");
   process.exit(1);
+}
+if (urlRef && ref !== urlRef) {
+  console.error(`SUPABASE_PROJECT_REF (${ref}) is not the project in NEXT_PUBLIC_SUPABASE_URL (${urlRef}). Refusing to push.`);
+  process.exit(1);
+}
+if (linkedRef && linkedRef !== ref) {
+  console.warn(`Note: the Supabase CLI is linked to ${linkedRef}, but the app uses ${ref}. Pushing to ${ref}.`);
+  console.warn(`      Run \`npx supabase link --project-ref ${ref}\` so \`npm run db:push\` targets the same project.`);
 }
 
 async function query(sql) {

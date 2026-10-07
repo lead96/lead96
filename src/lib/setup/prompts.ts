@@ -2,9 +2,9 @@
  * Prompts and strict JSON schemas for the setup chat and the campaign plan.
  * Bump the versions when wording or schema changes; they are stored with each output.
  */
-import { LEAD_TYPES, REQUIRED_FIELDS, WEEKDAYS, missingFields, type SetupDraft } from "./draft";
+import { LEAD_TYPES, WEEKDAYS, describeHours, type SetupDraft } from "./draft";
 
-export const SETUP_PROMPT_VERSION = "setup-chat@3";
+export const SETUP_PROMPT_VERSION = "setup-chat@5";
 export const PLAN_PROMPT_VERSION = "campaign-plan@1";
 
 export type Option = { value: string; label: string };
@@ -85,37 +85,42 @@ export function setupTurnSchema(ctx: SetupContext) {
 
 export type ChatPromptForModel = { text: string; options?: string[] };
 
+/** What we know so far, compact: empty fields dropped, ZIP list reduced to a count. */
+export function compactDraft(d: SetupDraft) {
+  const out: Record<string, unknown> = {};
+  if (d.services.length) out.services = d.services;
+  if (d.lead_types.length) out.lead_types = d.lead_types;
+  if (d.customer_types.length) out.customer_types = d.customer_types;
+  if (d.zip_codes.length) out.service_area = d.area_description ?? `${d.zip_codes.length} ZIP codes`;
+  if (Object.keys(d.booking_hours).length) out.hours = describeHours(d.booking_hours);
+  if (d.capacity_per_day !== null) out.capacity_per_day = d.capacity_per_day;
+  if (d.monthly_budget !== null) out.monthly_budget = d.monthly_budget;
+  if (d.transfer_phone) out.transfer_phone = d.transfer_phone;
+  if (d.extra_questions.length) out.extra_questions = d.extra_questions;
+  return out;
+}
+
 /**
- * The model does not run the conversation; the app asks the questions (see questions.ts).
- * The model turns the owner's latest message into structured updates.
+ * The model does not run the conversation; the app asks the questions and maps button
+ * clicks itself (see questions.ts). The model only interprets typed answers.
  */
 export function setupSystemPrompt(ctx: SetupContext, draft: SetupDraft, pending: ChatPromptForModel) {
-  const opts = (o: Option[]) => o.map((x) => `"${x.label}" → ${x.value}`).join(", ");
-  const missing = missingFields(draft);
-  const label = (key: string) => REQUIRED_FIELDS.find((f) => f.key === key)?.label ?? key;
-
-  return `You interpret answers in the setup chat of Lead96 for "${ctx.businessName}", a US HVAC contractor. The app asks the questions and shows answer buttons; you turn the owner's LATEST message into structured updates. Plain English, no marketing talk.
-
-The question the owner is answering: "${pending.text.replace(/\s+/g, " ")}"${pending.options?.length ? `
-Buttons shown: ${pending.options.map((o) => `"${o}"`).join(", ")}` : ""}
-Still missing: ${missing.length ? missing.map(label).join(", ") : "nothing"}.
+  const opts = (o: Option[]) => o.map((x) => `${x.value} (${x.label})`).join(", ");
+  return `Turn the owner's latest typed message into structured updates for the setup of "${ctx.businessName}", a US HVAC contractor.
+Pending question: "${pending.text.replace(/\s+/g, " ").slice(0, 200)}"
 
 Rules:
-- "updates" holds ONLY facts stated in the latest message. null = no change. A list replaces the whole previous list, so when the owner adds to a list, send the full new list.
-- Never guess or invent values. Never generate ZIP codes.
-- Button labels map to values. Services: ${opts(ctx.services)}. Customer types: ${opts(ctx.customerTypes)}. Lead types: "Phone calls" → ["call"], "Web forms" → ["form"], "Both" → ["form","call"].
-- "All" / "everything" / "All services" / "All customers" means every allowed value of that list.
-- Hours: "Mon–Fri 8am–5pm" → mon,tue,wed,thu,fri 08:00–17:00; "Mon–Sat 8am–6pm" → mon–sat 08:00–18:00; "Every day 7am–7pm" → all 7 days 07:00–19:00. Free-text hours → 24h HH:MM per weekday. "Other hours" alone → understood=false, ask for their days and times.
-- Capacity: "10+" → 10. Budget: "$2,000" → 2000, monthly USD; daily/weekly amounts → understood=false, ask for the monthly total. "Other amount" alone → understood=false, ask for the amount.
-- Service area: ZIP codes typed by the owner → zip_codes. A city, town, county, area, "around X" or "X, N miles" → fill area_lookup (city; 2-letter state if stated or obvious; radius_miles only if stated; center_zip if a ZIP was given as the centre) and leave zip_codes null. A "City, ST" button → area_lookup with that city and state. Do NOT ask the owner for ZIP codes.
-- The owner may change an earlier answer or answer a different question at any time. Extract whatever they state — e.g. a new city or radius → area_lookup even if the pending question is about hours. When you set area_lookup, zip_codes must be null.
-- transfer_phone: the number as typed.
-- AI call questions: "Looks good" / yes / fine → questions_confirmed=true. "Add a question" alone → understood=false, ask what question to add. A question text → extra_questions (full list incl. earlier ones) and questions_confirmed=true.
-- Change-request buttons in update mode ("Services", "Service area", "Hours", "Capacity or budget", "Transfer phone", "AI call questions") → understood=false; reply asks that one question briefly.
-- Optional facts (appointment length, target cost per appointment) → record only if mentioned; never ask for them.
-- reply: never say "saved", never list ZIP codes, never promise results or lead volumes. Unrelated question → one-sentence answer, then steer back.
+- updates = only facts in the latest message; null = no change; never invent values or ZIP codes. A list replaces the old list, so send the full new list (known values below).
+- services: ${opts(ctx.services)}. customer_types: ${opts(ctx.customerTypes)}. lead_types: call, form. "All"/"everything" = every value of that list.
+- Hours → 24h HH:MM per weekday. Budget = monthly USD; a daily/weekly amount → understood=false and ask for the monthly total.
+- A place instead of ZIPs (city, area, "around X", "X, 20 miles") → area_lookup (city; 2-letter state if stated or obvious; radius_miles only if stated; center_zip if a ZIP is the centre) and zip_codes null. Typed ZIP codes → zip_codes.
+- The owner may answer a different question or change an earlier answer — extract whatever they state.
+- A new call question → extra_questions (full list) and questions_confirmed=true. "Fine"/"looks good" about the questions → questions_confirmed=true.
+- Optional facts (appointment length, target cost per appointment) only if mentioned.
+- area_lookup only when the LATEST message names a place; otherwise null.
+- reply: if understood, "OK"; otherwise one short clarifying question (≤ 25 words). Never say "saved", never list ZIP codes, never promise results.
 
-Known so far (JSON): ${JSON.stringify(draft)}`;
+Known: ${JSON.stringify(compactDraft(draft))}`;
 }
 
 // ---------------------------------------------------------------------------

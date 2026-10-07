@@ -65,3 +65,89 @@ describe("questions", () => {
     expect(greetingPrompt(ctx, false, emptyDraft()).options).toContain("All services");
   });
 });
+
+describe("resolveButtonAnswer (button clicks skip the model)", async () => {
+  const { resolveButtonAnswer, questionFor } = await import("@/lib/setup/questions");
+  const d = emptyDraft();
+  const ask = (field: Parameters<typeof questionFor>[0]) => questionFor(field, ctx);
+
+  it("maps single- and multi-select labels to values", () => {
+    expect(resolveButtonAnswer("Repair, Replacement", ask("services"), ctx, d)).toEqual({ kind: "updates", updates: { services: ["repair", "replacement"] } });
+    expect(resolveButtonAnswer("Repair, All services", ask("services"), ctx, d)).toEqual({ kind: "updates", updates: { services: ["repair", "replacement"] } });
+    expect(resolveButtonAnswer("All customers", ask("customer_types"), ctx, d)).toEqual({ kind: "updates", updates: { customer_types: ["homeowner"] } });
+    expect(resolveButtonAnswer("Both", ask("lead_types"), ctx, d)).toEqual({ kind: "updates", updates: { lead_types: ["form", "call"] } });
+    expect(resolveButtonAnswer("10+", ask("capacity_per_day"), ctx, d)).toEqual({ kind: "updates", updates: { capacity_per_day: 10 } });
+    expect(resolveButtonAnswer("$2,000", ask("monthly_budget"), ctx, d)).toEqual({ kind: "updates", updates: { monthly_budget: 2000 } });
+    const hours = resolveButtonAnswer("Mon–Sat 8am–6pm", ask("booking_hours"), ctx, d);
+    expect(hours?.kind === "updates" && hours.updates.booking_hours).toHaveLength(6);
+    expect(resolveButtonAnswer("Looks good", ask("questions_confirmed"), ctx, d)).toMatchObject({ kind: "updates", updates: { questions_confirmed: true } });
+  });
+
+  it("opens follow-up questions for 'other' buttons and update topics", () => {
+    expect(resolveButtonAnswer("Other hours", ask("booking_hours"), ctx, d)).toMatchObject({ kind: "ask" });
+    expect(resolveButtonAnswer("Add a question", ask("questions_confirmed"), ctx, d)).toMatchObject({ kind: "ask" });
+    const update = { text: "What would you like to change?", options: ["Services", "Service area"] };
+    expect(resolveButtonAnswer("Service area", update, ctx, d)).toMatchObject({ kind: "ask", prompt: { text: expect.stringContaining("Miami, 20 miles") } });
+  });
+
+  it("maps a City, ST pick to an area lookup", () => {
+    const which = { text: "Which Springfield do you mean?", options: ["Springfield, IL", "Springfield, MA"], radius_miles: 10 };
+    expect(resolveButtonAnswer("Springfield, MA", which, ctx, d)).toEqual({ kind: "area", city: "Springfield", state: "MA" });
+  });
+
+  it("leaves typed answers to the model", () => {
+    expect(resolveButtonAnswer("repairs and installs", ask("services"), ctx, d)).toBeNull();
+    expect(resolveButtonAnswer("Both, mostly calls", ask("lead_types"), ctx, d)).toBeNull();
+    expect(resolveButtonAnswer("Miami, 20 miles", ask("zip_codes"), ctx, d)).toBeNull();
+    expect(resolveButtonAnswer("3", ask("capacity_per_day"), ctx, d)).toBeNull();
+  });
+});
+
+describe("compactDraft", async () => {
+  const { compactDraft } = await import("@/lib/setup/prompts");
+  it("drops empty fields and reduces the ZIP list to a count", () => {
+    const zips = Array.from({ length: 138 }, (_, i) => String(33100 + i));
+    expect(compactDraft({ ...emptyDraft(), services: ["repair"], zip_codes: zips })).toEqual({ services: ["repair"], service_area: "138 ZIP codes" });
+    expect(compactDraft({ ...emptyDraft(), zip_codes: zips, area_description: "Miami, FL · 20 mi" }).service_area).toBe("Miami, FL · 20 mi");
+  });
+});
+
+describe("normalizeAreaLookup", async () => {
+  const { normalizeAreaLookup } = await import("@/lib/setup/area");
+  const l = (city: string | null, state: string | null = null) => ({ city, state, center_zip: null, radius_miles: 20 });
+  it("splits a state packed into the city field and drops filler words", () => {
+    expect(normalizeAreaLookup(l("Miami, FL"))).toMatchObject({ city: "Miami", state: "FL" });
+    expect(normalizeAreaLookup(l("Miami FL"))).toMatchObject({ city: "Miami", state: "FL" });
+    expect(normalizeAreaLookup(l("around Miami"))).toMatchObject({ city: "Miami", state: null });
+    expect(normalizeAreaLookup(l("Miami", "fl"))).toMatchObject({ city: "Miami", state: "FL" });
+  });
+  it("keeps real city names that end in two letters, and rejects bad states", () => {
+    expect(normalizeAreaLookup(l("El Paso"))).toMatchObject({ city: "El Paso", state: null });
+    expect(normalizeAreaLookup(l("Saint Paul"))).toMatchObject({ city: "Saint Paul" });
+    expect(normalizeAreaLookup(l("Miami", "Florida"))).toMatchObject({ city: "Miami", state: null });
+  });
+});
+
+describe("messageMentionsPlace", async () => {
+  const { messageMentionsPlace } = await import("@/lib/setup/area");
+  const l = (city: string | null, center_zip: string | null = null) => ({ city, state: null, center_zip, radius_miles: 20 });
+  it("only accepts lookups for places named in the latest message", () => {
+    expect(messageMentionsPlace("find me all zips around Miami, 20 miles", l("Miami"))).toBe(true);
+    expect(messageMentionsPlace("(214) 555-0199", l("Miami"))).toBe(false);
+    expect(messageMentionsPlace("15 miles from 33101", l(null, "33101"))).toBe(true);
+  });
+});
+
+describe("pickDominantCity", async () => {
+  const { pickDominantCity } = await import("@/lib/setup/area");
+  const rows = (...counts: [string, number][]) => counts.map(([state, zip_count]) => ({ state, zip_count }));
+  it("picks the obvious city and asks for genuinely ambiguous names (real ZIP counts)", () => {
+    expect(pickDominantCity(rows(["FL", 95], ["OK", 2]))?.state).toBe("FL"); // Miami
+    expect(pickDominantCity(rows(["OR", 60], ["ME", 9]))?.state).toBe("OR"); // Portland
+    expect(pickDominantCity(rows(["IL", 35], ["MA", 19]))).toBeNull(); // Springfield
+    expect(pickDominantCity(rows(["OH", 45], ["GA", 14]))).toBeNull(); // Columbus
+    expect(pickDominantCity(rows(["MO", 71], ["KS", 15]))).toBeNull(); // Kansas City
+    expect(pickDominantCity(rows(["TX", 105]))?.state).toBe("TX");
+    expect(pickDominantCity([])).toBeNull();
+  });
+});
