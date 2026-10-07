@@ -5,7 +5,7 @@ import "./globals.css";
 const inter = Inter({ variable: "--font-inter", subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: { default: "LeadGen OS", template: "%s · LeadGen OS" },
+  title: { default: "Lead96", template: "%s · Lead96" },
   description: "Leads, AI calls, bookings and revenue for home-service contractors.",
 };
 

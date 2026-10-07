@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { Metadata } from "next";
+import { Logo } from "@/components/logo";
 import type { ReactNode } from "react";
 import { Alert, Button, Card, buttonClass } from "@/components/ui";
 import { getUser } from "@/lib/auth";
@@ -20,9 +21,9 @@ type InvitePreview = {
 function Shell({ title, children }: { title: string; children: ReactNode }) {
   return (
     <div className="flex min-h-screen flex-col items-center justify-center px-4 py-12">
-      <Link href="/" className="mb-8 text-lg font-semibold text-slate-900">
-        LeadGen <span className="text-brand-600">OS</span>
-      </Link>
+      <div className="mb-8">
+        <Logo height={30} />
+      </div>
       <Card className="w-full max-w-sm p-6">
         <h1 className="text-lg font-semibold text-slate-900">{title}</h1>
         <div className="mt-3 space-y-4 text-sm text-slate-600">{children}</div>

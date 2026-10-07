@@ -1,12 +1,20 @@
 @import "tailwindcss";
 
+/*
+ * Lead96 brand (from the brand sheet in public/Logo):
+ *   Electric Blue #3B82F6 · Purple #8B5CF6 · Mint #10B981 · Dark #0B0F19
+ * Blue is the action colour. Purple appears only as the gradient end in the
+ * logo mark and a thin accent. Mint = success. Dark = sidebar / dark surfaces.
+ */
 @theme {
-  --color-brand-50: #eef6f5;
-  --color-brand-100: #d5ebe8;
-  --color-brand-200: #acd7d1;
-  --color-brand-600: #137a6f;
-  --color-brand-700: #0f6259;
-  --color-brand-900: #0b3b36;
+  --color-brand-50: #eff6ff;
+  --color-brand-100: #dbeafe;
+  --color-brand-200: #bfdbfe;
+  --color-brand-600: #3b82f6;
+  --color-brand-700: #2563eb;
+  --color-brand-900: #1e3a8a;
+  --color-accent-600: #8b5cf6;
+  --color-ink: #0b0f19;
   --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
 }
 

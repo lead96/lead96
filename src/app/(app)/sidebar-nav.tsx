@@ -39,7 +39,13 @@ export function SidebarNav({
             key={item.href}
             href={item.href}
             className={`whitespace-nowrap rounded-md px-3 py-2 text-sm ${
-              active ? "bg-brand-50 font-medium text-brand-700" : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
+              horizontal
+                ? active
+                  ? "bg-brand-50 font-medium text-brand-700"
+                  : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
+                : active
+                  ? "bg-white/10 font-medium text-white"
+                  : "text-slate-300 hover:bg-white/5 hover:text-white"
             }`}
           >
             {item.label}

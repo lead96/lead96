@@ -92,7 +92,7 @@ export function Alert({ tone = "info", children }: { tone?: "info" | "error" | "
   const tones = {
     info: "border-brand-200 bg-brand-50 text-brand-900",
     error: "border-red-200 bg-red-50 text-red-800",
-    success: "border-emerald-200 bg-emerald-50 text-emerald-800",
+    success: "border-emerald-200 bg-emerald-50 text-emerald-800", // mint #10B981 family
   };
   return <div className={cx("rounded-md border px-3 py-2 text-sm", tones[tone])}>{children}</div>;
 }

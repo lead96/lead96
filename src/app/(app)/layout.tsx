@@ -1,5 +1,5 @@
-import Link from "next/link";
 import { logout } from "@/app/(auth)/actions";
+import { Logo } from "@/components/logo";
 import { getProfile, requireWorkspace } from "@/lib/auth";
 import { SidebarNav } from "./sidebar-nav";
 
@@ -10,10 +10,10 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
 
   return (
     <div className="flex min-h-screen">
-      <aside className="hidden w-60 shrink-0 flex-col border-r border-slate-200 bg-white md:flex">
-        <Link href="/dashboard" className="px-5 py-5 text-lg font-semibold text-slate-900">
-          LeadGen <span className="text-brand-600">OS</span>
-        </Link>
+      <aside className="hidden w-60 shrink-0 flex-col bg-ink md:flex">
+        <div className="px-5 py-5">
+          <Logo on="dark" height={26} href="/dashboard" />
+        </div>
         <SidebarNav showSetup={showSetup} isAdmin={Boolean(profile?.is_platform_admin)} />
       </aside>
 

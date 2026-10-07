@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Logo } from "@/components/logo";
 import { Button, Input, buttonClass } from "@/components/ui";
 import { getUser } from "@/lib/auth";
 
@@ -14,9 +15,7 @@ export default async function HomePage() {
   return (
     <div className="min-h-screen bg-white">
       <header className="mx-auto flex max-w-6xl items-center justify-between px-4 py-5">
-        <span className="text-lg font-semibold">
-          LeadGen <span className="text-brand-600">OS</span>
-        </span>
+        <Logo height={32} />
         <nav className="flex items-center gap-2">
           {user ? (
             <Link href="/dashboard" className={buttonClass()}>
@@ -79,7 +78,7 @@ export default async function HomePage() {
         </section>
       </main>
 
-      <footer className="mx-auto max-w-6xl px-4 py-8 text-xs text-slate-400">© {new Date().getFullYear()} LeadGen OS</footer>
+      <footer className="mx-auto max-w-6xl px-4 py-8 text-xs text-slate-400">© {new Date().getFullYear()} Lead96</footer>
     </div>
   );
 }

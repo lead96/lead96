@@ -1,5 +1,5 @@
-import Link from "next/link";
 import type { Metadata } from "next";
+import { Logo } from "@/components/logo";
 import { Alert, Card } from "@/components/ui";
 import { ConfirmForm } from "./confirm-form";
 
@@ -8,7 +8,7 @@ export const metadata: Metadata = { title: "Continue" };
 const COPY: Record<string, { title: string; text: string; label: string }> = {
   recovery: { title: "Reset your password", text: "Continue to choose a new password.", label: "Continue" },
   email_change: { title: "Confirm your new email", text: "Continue to confirm your new email address.", label: "Confirm email" },
-  magiclink: { title: "Sign in", text: "Continue to sign in to LeadGen OS.", label: "Sign in" },
+  magiclink: { title: "Sign in", text: "Continue to sign in to Lead96.", label: "Sign in" },
 };
 const DEFAULT_COPY = { title: "Confirm your email", text: "Continue to confirm your email address.", label: "Confirm email" };
 
@@ -23,9 +23,9 @@ export default async function ConfirmPage({ searchParams }: PageProps<"/auth/con
 
   return (
     <div className="flex min-h-screen flex-col items-center justify-center px-4 py-12">
-      <Link href="/" className="mb-8 text-lg font-semibold text-slate-900">
-        LeadGen <span className="text-brand-600">OS</span>
-      </Link>
+      <div className="mb-8">
+        <Logo height={30} />
+      </div>
       <Card className="w-full max-w-sm p-6">
         <h1 className="text-lg font-semibold text-slate-900">{copy.title}</h1>
         {tokenHash || code ? (

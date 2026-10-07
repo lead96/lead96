@@ -1,4 +1,4 @@
-# LeadGen OS
+# Lead96 (LeadGen OS)
 
 AI lead-generation platform for home-service contractors: leads and calls in one CRM, an AI voice agent that qualifies and books, and outcome/revenue tracking by source.
 
@@ -35,6 +35,10 @@ For each hosted project (dev, staging, prod): Supabase → Authentication → Em
 `{{ .SiteURL }}` in the templates is the project's Site URL, so it must be the app URL for that environment. `supabase/config.toml` points to the same files for local Supabase.
 
 Supabase's built-in email sender only delivers to the project's team members and a few emails per hour. Before real users sign up, configure custom SMTP (Resend) under Authentication → SMTP.
+
+### Brand
+
+Lead96 palette (brand sheet in `public/Logo`): Electric Blue `#3B82F6` (actions, links), Purple `#8B5CF6` (gradient accent only), Mint `#10B981` (success), Dark `#0B0F19` (sidebar). Tokens live in `src/app/globals.css` (`brand-*`, `accent-600`, `ink`). Use `<Logo on="light|dark" />` from `src/components/logo.tsx`; trimmed renders are in `public/brand/`, originals in `public/Logo/`. App icons are Next file conventions: `src/app/favicon.ico`, `icon.png`, `apple-icon.png` (regenerate from `public/Logo/` if the logo changes). Plain CRM look — no gradients or glow on UI elements.
 
 ### Setup assistant and Business profile
 

@@ -68,7 +68,7 @@ export function setupSystemPrompt(ctx: SetupContext, draft: SetupDraft, rejected
   const label = (key: string) => REQUIRED_FIELDS.find((f) => f.key === key)?.label ?? key;
   const opts = (o: Option[]) => o.map((x) => `${x.value} (${x.label})`).join(", ");
 
-  return `You are the setup assistant of LeadGen OS. You help "${ctx.businessName}", a US HVAC contractor, describe the jobs they want so our AI can call and book their leads. The owner is not an advertising expert: use plain, friendly English, no marketing jargon.
+  return `You are the setup assistant of Lead96. You help "${ctx.businessName}", a US HVAC contractor, describe the jobs they want so our AI can call and book their leads. The owner is not an advertising expert: use plain, friendly English, no marketing jargon.
 
 How to behave:
 - Ask ONE short question at a time (max ~60 words per reply). Offer examples or choices when useful.
@@ -142,6 +142,6 @@ Rules:
 - Choose one landing page template and say why in one sentence.
 - Plain English for a contractor with no ads experience. No jargon, no guarantees, no lead-volume or cost predictions.
 - targeting_notes: 1–2 sentences about who and where to target (use the given service area, do not invent ZIP codes).
-- first_steps: 3–5 short actions the owner takes next in LeadGen OS (e.g. connect Google Ads, review landing page).
+- first_steps: 3–5 short actions the owner takes next in Lead96 (e.g. connect Google Ads, review landing page).
 - This is a recommendation only; nothing is launched automatically.`;
 }

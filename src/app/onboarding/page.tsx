@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Logo } from "@/components/logo";
 import { redirect } from "next/navigation";
 import { acceptInvite } from "@/app/invite/actions";
 import { Button, Card } from "@/components/ui";
@@ -20,8 +21,8 @@ export default async function OnboardingPage() {
 
   return (
     <div className="flex min-h-screen flex-col items-center justify-center px-4 py-12">
-      <div className="mb-8 text-lg font-semibold text-slate-900">
-        LeadGen <span className="text-brand-600">OS</span>
+      <div className="mb-8">
+        <Logo height={30} />
       </div>
       <div className="w-full max-w-md space-y-6">
         {invites && invites.length > 0 ? (
