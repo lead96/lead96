@@ -23,7 +23,7 @@ In the Supabase dashboard → Authentication → URL Configuration, set **Site U
 
 Auth emails must link to our `/auth/confirm` page with a `token_hash` (not Supabase's default `{{ .ConfirmationURL }}`). That way links work in any browser or device, and mail scanners opening the link don't use up the one-time token: it is only used when the user presses **Continue**.
 
-For each hosted project (dev, staging, prod): Supabase → Authentication → Emails, paste the HTML from `supabase/templates/` into the matching template:
+Supabase only allows custom templates once **custom SMTP** is configured (free tier + built-in sender = default templates only). After setting up SMTP (Resend), for each hosted project: Supabase → Authentication → Emails, paste the HTML from `supabase/templates/` into the matching template (or set them via the Management API `PATCH /v1/projects/{ref}/config/auth`):
 
 | Template | File |
 |---|---|

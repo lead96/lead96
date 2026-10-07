@@ -25,8 +25,13 @@ async function main() {
   });
   console.log(`Seeding ${rows.length} ZIP codes…`);
   for (let i = 0; i < rows.length; i += 1000) {
-    const { error } = await supabase.from("us_zip_codes").upsert(rows.slice(i, i + 1000), { onConflict: "zip" });
-    if (error) throw new Error(`batch ${i}: ${error.message}`);
+    // Upserts are idempotent, so a batch that fails on a dropped connection can simply be retried.
+    for (let attempt = 1; ; attempt++) {
+      const { error } = await supabase.from("us_zip_codes").upsert(rows.slice(i, i + 1000), { onConflict: "zip" });
+      if (!error) break;
+      if (attempt === 4) throw new Error(`batch ${i}: ${error.message}`);
+      await new Promise((r) => setTimeout(r, attempt * 2000));
+    }
     process.stdout.write(`\r${Math.min(i + 1000, rows.length)}/${rows.length}`);
   }
   const { count } = await supabase.from("us_zip_codes").select("*", { count: "exact", head: true });

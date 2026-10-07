@@ -66,7 +66,15 @@ async function main() {
     .sort()
     .map((f) => ({ file: f, version: f.split("_")[0], name: f.replace(/^\d+_/, "").replace(/\.sql$/, "") }));
 
-  const applied = new Set((await query("select version from supabase_migrations.schema_migrations")).map((r) => r.version));
+  // A brand-new project has no history table yet (the CLI creates it on first push); same shape as the CLI's.
+  if (!dryRun) {
+    await query(`create schema if not exists supabase_migrations;
+      create table if not exists supabase_migrations.schema_migrations (version text primary key, statements text[], name text);`);
+  }
+  const exists = (await query("select to_regclass('supabase_migrations.schema_migrations') is not null as ok"))[0]?.ok;
+  const applied = new Set(
+    exists ? (await query("select version from supabase_migrations.schema_migrations")).map((r) => r.version) : [],
+  );
   const remoteOnly = [...applied].filter((v) => !local.some((m) => m.version === v));
   if (remoteOnly.length) {
     console.error(`Remote has migrations not in ${dir}: ${remoteOnly.join(", ")}. Resolve before pushing.`);
