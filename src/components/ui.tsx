@@ -108,3 +108,18 @@ export function PageHeader({ title, description, actions }: { title: string; des
     </div>
   );
 }
+
+const badgeTones = {
+  slate: "bg-slate-100 text-slate-700",
+  blue: "bg-brand-50 text-brand-700",
+  green: "bg-emerald-50 text-emerald-700",
+  amber: "bg-amber-50 text-amber-800",
+  red: "bg-red-50 text-red-700",
+  violet: "bg-violet-50 text-violet-700",
+} as const;
+
+export function Badge({ tone = "slate", children }: { tone?: keyof typeof badgeTones; children: ReactNode }) {
+  return (
+    <span className={cx("inline-flex items-center rounded px-1.5 py-0.5 text-xs font-medium", badgeTones[tone])}>{children}</span>
+  );
+}

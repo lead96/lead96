@@ -44,6 +44,12 @@ Lead96 palette (brand sheet in `public/Logo`): Electric Blue `#3B82F6` (actions,
 
 `/setup` is the setup chat (owners). The app asks the questions and shows answer buttons (`src/lib/setup/questions.ts`); button clicks are mapped in code (no model call, ~1 s); only typed answers go to the model (`OPENAI_CHAT_MODEL`, default `gpt-4.1-nano`, with a compact prompt). The campaign plan uses `OPENAI_MODEL` (`gpt-4.1-mini`). It collects the demand profile, AI call settings and creates a campaign plan. `/profile` shows and edits the same data with forms, and regenerates the plan. Every value the model extracts is validated in `src/lib/setup/draft.ts`; plan numbers are computed in `src/lib/setup/plan.ts`. Prompts and JSON schemas are in `src/lib/setup/prompts.ts` — bump the prompt version when changing them. AI calls use `store: false` and are logged per workspace in `usage_records`.
 
+### Leads and landing pages (M2)
+
+Every lead or call — from any source — goes through `ingestLead()` (`src/lib/leads/ingest.ts`) → `ingest_lead()` in Postgres. It normalizes phone/email, matches an existing customer by phone or email (under a per-workspace lock), ignores repeat deliveries of the same `source + external_id`, and writes `lead.received` / `customer.created` events. Only the service role can call it; callers must check permission first. Customer status and notes change only through `set_customer_status()` / `update_customer_notes()`, which log an event.
+
+Landing pages (`/landing-pages`) are template + JSON content (`src/lib/landing/content.ts`), rendered by `src/components/landing/landing-page.tsx` both in the editor preview and publicly at `/p/{slug}`. Public submissions (`src/app/p/actions.ts`) store UTM/click IDs and a consent record; the consent text is versioned (`CONSENT_VERSION`).
+
 ### ZIP code data
 
 `public.us_zip_codes` holds ~41k US ZIPs with city, state and coordinates, from [GeoNames](https://www.geonames.org) postal codes (CC BY 4.0 — keep the attribution). The CSV is in `supabase/seed/us_zip_codes.csv`; load it with `npm run db:seed:zips` after the migration (idempotent). The setup chat uses `zip_city_matches` / `zips_within` to turn "Miami, 20 miles" into a ZIP list — the AI never generates ZIP codes.
