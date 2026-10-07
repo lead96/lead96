@@ -36,6 +36,10 @@ For each hosted project (dev, staging, prod): Supabase → Authentication → Em
 
 Supabase's built-in email sender only delivers to the project's team members and a few emails per hour. Before real users sign up, configure custom SMTP (Resend) under Authentication → SMTP.
 
+### Setup assistant and Business profile
+
+`/setup` is the AI chat (owners) that collects the demand profile, AI call settings and creates a campaign plan. `/profile` shows and edits the same data with forms, and regenerates the plan. Every value the model extracts is validated in `src/lib/setup/draft.ts`; plan numbers are computed in `src/lib/setup/plan.ts`. Prompts and JSON schemas are in `src/lib/setup/prompts.ts` — bump the prompt version when changing them. AI calls use `store: false` and are logged per workspace in `usage_records`.
+
 ### Team invites
 
 Owners invite from **Settings**. Until the email provider is set up, the owner copies the invite link and sends it themselves; automatic invite emails come with Resend. The link opens `/invite/<token>`, which works signed in or out and explains wrong-account, expired, used and cancelled cases. Invites also appear on `/onboarding` for anyone signed in with the invited (verified) email.
@@ -49,6 +53,7 @@ Owners invite from **Settings**. Until the email provider is set up, the owner c
 | `npm run lint` | ESLint |
 | `npm test` | Vitest. `tests/rls.test.ts` checks tenant isolation against the linked Supabase project (skipped without env) |
 | `npm run db:push` | Apply migrations to the linked project |
+| `npm run db:push:https` | Same, through the Supabase Management API over HTTPS — use when a VPN blocks Postgres ports. Needs `SUPABASE_ACCESS_TOKEN` in `.env.local`. `-- --dry-run` lists pending migrations |
 | `npm run db:types` | Regenerate `src/lib/supabase/database.types.ts` |
 
 ## Layout

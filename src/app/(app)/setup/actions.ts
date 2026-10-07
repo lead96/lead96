@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { after } from "next/server";
 import { AiUnavailableError, recordAiUsage, structuredCompletion } from "@/lib/ai/openai";
 import { requireOwner, requireUser } from "@/lib/auth";
 import { mergeUpdates, missingFields, type DraftUpdates, type RequiredField, type SetupDraft } from "@/lib/setup/draft";
@@ -30,13 +31,16 @@ const MAX_USER_TURNS = 40;
 const MAX_TOKENS_PER_CONVERSATION = 80_000;
 const HISTORY_MESSAGES = 24;
 
-/** Friendly sentence appended when the owner's answer could not be saved. */
-function rejectionNote(rejected: string[]) {
+/**
+ * When the owner's answer fails validation, this replaces the model's reply: the model
+ * can't know the value was refused and would otherwise move on as if it was accepted.
+ */
+function rejectionReply(rejected: string[]) {
   const notes = new Set<string>();
   for (const r of rejected) {
-    if (r.startsWith("zip_codes")) notes.add("I couldn't find a valid 5-digit ZIP code there — could you type the ZIP codes you serve?");
+    if (r.startsWith("zip_codes")) notes.add("I couldn't find a valid 5-digit ZIP code there — could you type the ZIP codes you serve, like 75201, 75204?");
     else if (r.startsWith("booking_hours")) notes.add("I couldn't read those hours — could you write them like “Mon–Fri 8am–5pm”?");
-    else if (r.startsWith("transfer_phone")) notes.add("That phone number doesn't look like a valid US number — could you check it?");
+    else if (r.startsWith("transfer_phone")) notes.add("That phone number doesn't look like a valid US number — could you send it again with the area code, like (214) 555-0100?");
     else if (/^(capacity_per_day|appointment_minutes|monthly_budget|target_cost_per_appointment)/.test(r))
       notes.add("One of those numbers looks out of range, so I didn't save it — could you check it?");
   }
@@ -53,7 +57,8 @@ export async function sendSetupMessage(prev: ChatState, formData: FormData): Pro
   }
 
   const supabase = await createClient();
-  const conversation = (await getActiveConversation(supabase, workspace.id)) ?? (await startConversation(supabase, workspace, user.id));
+  const [existing, ctx] = await Promise.all([getActiveConversation(supabase, workspace.id), loadSetupContext(supabase, workspace)]);
+  const conversation = existing ?? (await startConversation(supabase, workspace, user.id));
   if (conversation.user_turns >= MAX_USER_TURNS || conversation.total_tokens >= MAX_TOKENS_PER_CONVERSATION) {
     return {
       ...prev,
@@ -62,7 +67,6 @@ export async function sendSetupMessage(prev: ChatState, formData: FormData): Pro
     };
   }
 
-  const ctx = await loadSetupContext(supabase, workspace);
   const history = conversation.messages.slice(-HISTORY_MESSAGES).map(({ role, content }) => ({ role, content }));
 
   let result;
@@ -87,12 +91,11 @@ export async function sendSetupMessage(prev: ChatState, formData: FormData): Pro
     services: ctx.services.map((s) => s.value),
     customerTypes: ctx.customerTypes.map((s) => s.value),
   });
-  const note = rejectionNote(rejected);
   const now = new Date().toISOString();
   const messages: ChatMessage[] = [
     ...conversation.messages,
     { role: "user", content: text, at: now },
-    { role: "assistant", content: [result.data.reply.trim(), note].filter(Boolean).join("\n\n"), at: now },
+    { role: "assistant", content: rejectionReply(rejected) || result.data.reply.trim(), at: now },
   ];
 
   const { error } = await supabase
@@ -106,8 +109,11 @@ export async function sendSetupMessage(prev: ChatState, formData: FormData): Pro
     })
     .eq("id", conversation.id);
   if (error) throw error;
-  await recordAiUsage(workspace.id, user.id, "setup_chat", result.usage);
-  if (rejected.length) console.warn(`setup chat (${SETUP_PROMPT_VERSION}) rejected:`, rejected);
+  // Bookkeeping doesn't need to hold up the reply.
+  after(async () => {
+    await recordAiUsage(workspace.id, user.id, "setup_chat", result.usage);
+    if (rejected.length) console.warn(`setup chat (${SETUP_PROMPT_VERSION}) rejected:`, rejected);
+  });
 
   return { messages, draft, missing: missingFields(draft) };
 }

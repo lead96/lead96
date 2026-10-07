@@ -78,6 +78,11 @@ describe("mergeUpdates", () => {
     expect(draft.zip_codes).toEqual(["75201"]);
   });
 
+  it("adding your own call questions counts as confirming the question list", () => {
+    expect(mergeUpdates(emptyDraft(), { extra_questions: ["Is the unit on the roof?"] }, vocab).draft.questions_confirmed).toBe(true);
+    expect(mergeUpdates(emptyDraft(), { notes: "hi" }, vocab).draft.questions_confirmed).toBe(false);
+  });
+
   it("does not mutate the input draft", () => {
     const start = emptyDraft();
     mergeUpdates(start, { services: ["repair"] }, vocab);
@@ -170,5 +175,13 @@ describe("campaign plan post-processing", async () => {
     expect(callsOnly.channels.map((c) => c.channel)).toEqual(["google_search"]);
     const formsOnly = buildPlan({ ...out, channels: [{ channel: "google_call_ads", share_percent: 100, reason: "" }] }, { ...base, lead_types: ["form"] }).plan;
     expect(formsOnly.channels.map((c) => c.channel)).toEqual(["google_search"]);
+  });
+});
+
+describe("formatUsPhone", () => {
+  it("formats stored E.164 numbers for display", async () => {
+    const { formatUsPhone } = await import("@/lib/setup/draft");
+    expect(formatUsPhone("+12145550199")).toBe("(214) 555-0199");
+    expect(formatUsPhone(null)).toBe("");
   });
 });

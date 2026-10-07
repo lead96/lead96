@@ -2,7 +2,7 @@
 
 import { startTransition, useActionState, useState, type FormEvent, type ReactNode } from "react";
 import { Alert, Button, Field, Input } from "@/components/ui";
-import { WEEKDAYS, WEEKDAY_LABELS, type AgentQuestion, type BookingHours } from "@/lib/setup/draft";
+import { WEEKDAYS, WEEKDAY_LABELS, formatUsPhone, type AgentQuestion, type BookingHours } from "@/lib/setup/draft";
 import type { Option } from "@/lib/setup/prompts";
 import { regeneratePlan, saveAgentSettings, saveDemandProfile, type ProfileState } from "./actions";
 
@@ -98,14 +98,14 @@ export function DemandProfileForm({
             {WEEKDAYS.map((day) => {
               const range = values.booking_hours[day]?.[0];
               return (
-                <div key={day} className="flex flex-wrap items-center gap-2 text-sm">
-                  <label className="flex w-16 items-center gap-2 text-slate-700">
+                <div key={day} className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-x-2 gap-y-1 text-sm sm:grid-cols-[4.5rem_8.5rem_auto_8.5rem] sm:justify-start">
+                  <label className="col-span-3 flex items-center gap-2 text-slate-700 sm:col-span-1">
                     <input type="checkbox" name={`hours_${day}_on`} defaultChecked={Boolean(range)} className="h-4 w-4 accent-brand-600" />
                     {WEEKDAY_LABELS[day]}
                   </label>
-                  <Input type="time" name={`hours_${day}_start`} defaultValue={range?.start ?? "08:00"} aria-label={`${WEEKDAY_LABELS[day]} start`} className="w-32" />
+                  <Input type="time" name={`hours_${day}_start`} defaultValue={range?.start ?? "08:00"} aria-label={`${WEEKDAY_LABELS[day]} start`} />
                   <span className="text-slate-400">to</span>
-                  <Input type="time" name={`hours_${day}_end`} defaultValue={range?.end ?? "17:00"} aria-label={`${WEEKDAY_LABELS[day]} end`} className="w-32" />
+                  <Input type="time" name={`hours_${day}_end`} defaultValue={range?.end ?? "17:00"} aria-label={`${WEEKDAY_LABELS[day]} end`} />
                 </div>
               );
             })}
@@ -169,7 +169,7 @@ export function AgentSettingsForm({
       <fieldset disabled={readOnly} className="space-y-5">
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="Phone for live transfers" htmlFor="transfer_phone" hint="When a caller asks for a person, the AI transfers here.">
-            <Input id="transfer_phone" name="transfer_phone" type="tel" defaultValue={transferPhone ?? ""} />
+            <Input id="transfer_phone" name="transfer_phone" type="tel" defaultValue={formatUsPhone(transferPhone)} />
           </Field>
           <Field label="Greeting" htmlFor="greeting" hint="Optional. How the AI opens a call.">
             <Input id="greeting" name="greeting" maxLength={300} defaultValue={greeting ?? ""} placeholder="Hi, this is the scheduling assistant for …" />

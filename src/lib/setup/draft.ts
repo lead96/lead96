@@ -94,6 +94,12 @@ export function normalizeUsPhone(input: string): string | null {
   return `+1${national}`;
 }
 
+/** +12145550199 → (214) 555-0199 for display. Anything else is shown unchanged. */
+export function formatUsPhone(e164: string | null): string {
+  const m = e164?.match(/^\+1(\d{3})(\d{3})(\d{4})$/);
+  return m ? `(${m[1]}) ${m[2]}-${m[3]}` : (e164 ?? "");
+}
+
 const TIME = /^([01]\d|2[0-3]):([0-5]\d)$/;
 
 export function normalizeHours(ranges: { day: string; start: string; end: string }[]): BookingHours {
@@ -202,7 +208,10 @@ export function mergeUpdates(
   if (u.extra_questions) {
     next.extra_questions = [...new Set(u.extra_questions.map((q) => cleanText(q, 200)).filter((q) => q.length >= 5))].slice(0, 10);
   }
-  if (u.questions_confirmed === true) next.questions_confirmed = true;
+  // Adding their own questions means the owner has reviewed the question list.
+  if (u.questions_confirmed === true || next.extra_questions.length > draft.extra_questions.length) {
+    next.questions_confirmed = true;
+  }
   if (u.notes) next.notes = cleanText(u.notes, 1000);
 
   return { draft: next, rejected };

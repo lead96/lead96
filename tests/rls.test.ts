@@ -192,6 +192,25 @@ describe.skipIf(!configured)("row-level security", () => {
     expect(res.error?.message).toContain("invite_expired");
   });
 
+  it("usage records: server-written only; visible to the owner, not staff or other businesses", async () => {
+    const seeded = await admin
+      .from("usage_records")
+      .insert({ workspace_id: wsA, kind: "ai_tokens", feature: "test", quantity: 123 })
+      .select("id")
+      .single();
+    expect(seeded.error).toBeNull();
+
+    expect((await ownerA.client.from("usage_records").select("quantity").eq("workspace_id", wsA)).data).toEqual([{ quantity: 123 }]);
+    expect((await staffA.client.from("usage_records").select("id").eq("workspace_id", wsA)).data).toEqual([]);
+    expect((await ownerB.client.from("usage_records").select("id").eq("workspace_id", wsA)).data).toEqual([]);
+
+    // Nobody can write usage from the browser (it will drive billing).
+    const forged = await ownerA.client.from("usage_records").insert({ workspace_id: wsA, kind: "ai_tokens", feature: "x", quantity: -999 });
+    expect(forged.error).not.toBeNull();
+    await ownerA.client.from("usage_records").delete().eq("id", seeded.data!.id);
+    expect((await admin.from("usage_records").select("id").eq("id", seeded.data!.id)).data).toHaveLength(1);
+  });
+
   // Keep last: removes staffA.
   it("a user with history can be deleted; audit rows remain without the link", async () => {
     const { error } = await admin.auth.admin.deleteUser(staffA.id);

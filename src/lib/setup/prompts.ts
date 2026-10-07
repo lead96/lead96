@@ -4,7 +4,7 @@
  */
 import { LEAD_TYPES, REQUIRED_FIELDS, WEEKDAYS, missingFields, type SetupDraft } from "./draft";
 
-export const SETUP_PROMPT_VERSION = "setup-chat@1";
+export const SETUP_PROMPT_VERSION = "setup-chat@2";
 export const PLAN_PROMPT_VERSION = "campaign-plan@1";
 
 export type Option = { value: string; label: string };
@@ -79,9 +79,10 @@ How to behave:
 - Budget is per month in USD. If they give a daily or weekly amount, ask them to confirm the monthly total.
 - Lists replace the previous list, so when the owner adds to a list, send the full new list.
 - Services allowed: ${opts(ctx.services)}. Customer types allowed: ${opts(ctx.customerTypes)}. Lead types: form (web form leads), call (phone calls).
-- AI call questions: the AI caller already asks these defaults: ${ctx.defaultQuestions.map((q) => `"${q}"`).join("; ")}. Show them briefly and ask if the owner wants to add any of their own. When they say the questions are fine (with or without additions), set questions_confirmed=true and put any added questions in extra_questions.
-- transfer_phone: the number our AI transfers live calls to when a caller asks for a person.
-- Optional, ask once only if it fits naturally: target cost per booked appointment, appointment length in minutes.
+- AI call questions: the AI caller already asks these defaults: ${ctx.defaultQuestions.map((q) => `"${q}"`).join("; ")}. Show them briefly and ask if the owner wants to add any of their own. In the SAME turn the owner answers (yes/no/"fine"/"looks good", or gives extra questions), set questions_confirmed=true and put any added questions in extra_questions.
+- transfer_phone: the number our AI transfers live calls to when a caller asks for a person. It must be a US number with area code.
+- Ask ONLY for the missing items listed above. Do not ask for anything else (appointment length, target cost, etc.); record them only if the owner mentions them.
+- Never say a value was "saved" — the app checks every value and tells the owner if something is wrong.
 - Do not promise results, lead volumes, prices or ad performance. Do not discuss anything unrelated to setting up the business; steer back politely.
 - When nothing is missing, give a 1–2 sentence wrap-up and tell the owner to check the summary and press "Save setup" below. Do not list every field again.
 

@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useActionState, useEffect, useRef, useState } from "react";
 import { useFormStatus } from "react-dom";
 import { Alert, Button, Card } from "@/components/ui";
-import { REQUIRED_FIELDS, describeHours, type SetupDraft } from "@/lib/setup/draft";
+import { REQUIRED_FIELDS, describeHours, formatUsPhone, type SetupDraft } from "@/lib/setup/draft";
 import type { Option } from "@/lib/setup/prompts";
 import { finishSetup, restartSetup, sendSetupMessage, type ChatState } from "./actions";
 
@@ -23,7 +23,7 @@ function fieldValue(key: string, d: SetupDraft, o: { services: Option[]; custome
     case "booking_hours": return describeHours(d.booking_hours);
     case "capacity_per_day": return d.capacity_per_day === null ? "" : `${d.capacity_per_day} per day`;
     case "monthly_budget": return d.monthly_budget === null ? "" : `$${d.monthly_budget.toLocaleString("en-US")} / month`;
-    case "transfer_phone": return d.transfer_phone ?? "";
+    case "transfer_phone": return formatUsPhone(d.transfer_phone);
     case "questions_confirmed":
       return d.questions_confirmed ? (d.extra_questions.length ? `Defaults + ${d.extra_questions.length} of yours` : "Default questions") : "";
     default: return "";
