@@ -14,12 +14,18 @@ const serverSchema = publicSchema.extend({
   OPENAI_CHAT_MODEL: z.string().min(1).default("gpt-4.1-nano"),
   /** Shared secret for signed webhooks into /api/intake/* (call intake). Intake is off when unset. */
   INTAKE_SIGNING_SECRET: z.string().min(32).optional(),
-  // Google Ads via the Lead96 manager account (agency model). Refresh token = one-time admin@lead96.com sign-in.
+  /** 32 bytes as 64 hex chars. Encrypts stored platform sign-ins (Google Ads refresh token). */
+  CREDENTIALS_ENCRYPTION_KEY: z.string().regex(/^[0-9a-f]{64}$/i).optional(),
+  /** Vercel Cron sends it as a Bearer token; scheduled syncs are refused without it. */
+  CRON_SECRET: z.string().min(16).optional(),
+  // Google Ads via the Lead96 manager account (agency model). The sign-in itself is stored
+  // encrypted in platform_connections (Admin → Google Ads → Connect).
   GOOGLE_CLIENT_ID: z.string().min(1).optional(),
   GOOGLE_CLIENT_SECRET: z.string().min(1).optional(),
   GOOGLE_ADS_DEVELOPER_TOKEN: z.string().min(1).optional(),
+  /** Manager (MCC) account ID; dashes are ignored. */
   GOOGLE_ADS_MANAGER_ID: z.string().min(1).optional(),
-  GOOGLE_ADS_REFRESH_TOKEN: z.string().min(1).optional(),
+  GOOGLE_ADS_API_VERSION: z.string().regex(/^v\d+$/).default("v25"),
   // Meta via the Lead96 Business Manager + System User token (agency model).
   META_APP_ID: z.string().min(1).optional(),
   META_APP_SECRET: z.string().min(1).optional(),
@@ -32,7 +38,9 @@ const OPTIONAL_KEYS = [
   "GOOGLE_CLIENT_SECRET",
   "GOOGLE_ADS_DEVELOPER_TOKEN",
   "GOOGLE_ADS_MANAGER_ID",
-  "GOOGLE_ADS_REFRESH_TOKEN",
+  "GOOGLE_ADS_API_VERSION",
+  "CREDENTIALS_ENCRYPTION_KEY",
+  "CRON_SECRET",
   "META_APP_ID",
   "META_APP_SECRET",
   "META_SYSTEM_USER_TOKEN",

@@ -2,6 +2,7 @@ import { after } from "next/server";
 import { serverEnv } from "@/lib/env";
 import { callPayloadSchema, callToLead } from "@/lib/intake/call";
 import { SIGNATURE_HEADER, TIMESTAMP_HEADER, verify } from "@/lib/intake/signature";
+import { logDelivery } from "@/lib/intake/deliveries";
 import { ingestLead } from "@/lib/leads/ingest";
 import { createAdminClient } from "@/lib/supabase/server";
 
@@ -40,7 +41,7 @@ export async function POST(request: Request) {
   const workspaceId = typeof raw?.workspace_id === "string" && UUID.test(raw.workspace_id) ? raw.workspace_id : null;
   const callId = typeof raw?.call_id === "string" ? raw.call_id.slice(0, 200) : null;
   const log = (d: { status: "processed" | "duplicate" | "rejected" | "failed"; error?: string; leadId?: string; workspaceId?: string | null }) =>
-    after(() => logDelivery({ ...d, externalId: callId, workspaceId: d.workspaceId === undefined ? workspaceId : d.workspaceId, payload: json }));
+    after(() => logDelivery({ ...d, provider: "call", externalId: callId, workspaceId: d.workspaceId === undefined ? workspaceId : d.workspaceId, payload: json }));
 
   const parsed = callPayloadSchema.safeParse(json);
   if (!parsed.success) {
@@ -72,35 +73,4 @@ async function existingWorkspace(id: string | null): Promise<string | null> {
   if (!id) return null;
   const { data } = await createAdminClient().from("workspaces").select("id").eq("id", id).maybeSingle();
   return data?.id ?? null;
-}
-
-async function logDelivery(d: {
-  status: "processed" | "duplicate" | "rejected" | "failed";
-  error?: string;
-  leadId?: string;
-  workspaceId: string | null;
-  externalId: string | null;
-  payload: unknown;
-}) {
-  const admin = createAdminClient();
-  let attempt = 1;
-  if (d.externalId) {
-    const { count } = await admin
-      .from("webhook_deliveries")
-      .select("id", { count: "exact", head: true })
-      .eq("provider", "call")
-      .eq("external_id", d.externalId);
-    attempt = (count ?? 0) + 1;
-  }
-  const { error } = await admin.from("webhook_deliveries").insert({
-    provider: "call",
-    external_id: d.externalId,
-    workspace_id: d.workspaceId,
-    status: d.status,
-    error: d.error?.slice(0, 1000) ?? null,
-    lead_id: d.leadId ?? null,
-    attempt,
-    payload: d.payload,
-  });
-  if (error) console.error("webhook_deliveries insert failed:", error.message);
 }

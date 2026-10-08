@@ -1,5 +1,6 @@
 import "server-only";
 import { serverEnv } from "@/lib/env";
+import { GoogleAdsError, getConnection, listClientAccounts } from "@/lib/google/ads";
 import { createClient } from "@/lib/supabase/server";
 
 export type LiveCheck = { key: string; label: string; ok: boolean | null; detail: string; ms: number | null };
@@ -42,11 +43,20 @@ export async function runLiveChecks(): Promise<LiveCheck[]> {
         signal: AbortSignal.timeout(TIMEOUT_MS),
       });
       const body = (await res.json().catch(() => ({}))) as { error?: string };
-      if (body.error === "invalid_grant") {
-        return pass(env.GOOGLE_ADS_REFRESH_TOKEN ? "Client ID and secret valid." : "Client ID and secret valid. Admin sign-in still needed.");
-      }
+      if (body.error === "invalid_grant") return pass("Client ID and secret valid.");
       if (body.error === "invalid_client" || body.error === "unauthorized_client") return fail("Client ID or secret is wrong.");
       return fail(`Unexpected answer: ${body.error ?? res.status}.`);
+    }),
+
+    timed("google_ads", "Google Ads API", async () => {
+      const connection = await getConnection();
+      if (!connection) return skip("Not connected yet (Admin → Google Ads → Connect).");
+      try {
+        const accounts = await listClientAccounts();
+        return pass(`Signed in as ${connection.account_email ?? "unknown"}; ${accounts.length} ad account${accounts.length === 1 ? "" : "s"} under the manager account.`);
+      } catch (e) {
+        return fail(e instanceof GoogleAdsError ? e.message : "Request failed.");
+      }
     }),
 
     timed("meta", "Meta app + System User token", async () => {

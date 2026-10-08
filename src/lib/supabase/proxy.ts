@@ -2,8 +2,8 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
 // /invite and /reset-password handle the signed-out case themselves, with a clearer message.
-// /p/* are published landing pages for homeowners. /api/intake/* are signed webhooks (checked in the route).
-const PUBLIC_PATHS = ["/", "/login", "/signup", "/forgot-password", "/reset-password", "/auth", "/invite", "/p", "/api/intake"];
+// /p/* are published landing pages for homeowners. /api/intake/* and /api/cron/* check their own keys.
+const PUBLIC_PATHS = ["/", "/login", "/signup", "/forgot-password", "/reset-password", "/auth", "/invite", "/p", "/api/intake", "/api/cron"];
 
 function isPublic(pathname: string) {
   return PUBLIC_PATHS.some((p) => pathname === p || (p !== "/" && pathname.startsWith(`${p}/`)));

@@ -53,6 +53,8 @@ export type Integration = {
   stats: Stat[];
   config?: ConfigItem[];
   problem?: Problem;
+  /** Settings page for this integration, if it has one. */
+  href?: string;
 };
 
 /** Credentials each integration needs (names only — values never leave the server). */
@@ -64,7 +66,8 @@ export const CONFIG: Record<string, { key: string; label: string }[]> = {
     { key: "GOOGLE_CLIENT_SECRET", label: "OAuth client secret" },
     { key: "GOOGLE_ADS_DEVELOPER_TOKEN", label: "Google Ads developer token" },
     { key: "GOOGLE_ADS_MANAGER_ID", label: "Manager account (MCC) ID" },
-    { key: "GOOGLE_ADS_REFRESH_TOKEN", label: "admin@lead96.com sign-in" },
+    { key: "CREDENTIALS_ENCRYPTION_KEY", label: "Encryption key for stored sign-ins" },
+    { key: "GOOGLE_ADS_CONNECTION", label: "Google Ads sign-in (Admin → Google Ads)" },
   ],
   meta: [
     { key: "META_APP_ID", label: "Meta app ID" },
@@ -75,7 +78,7 @@ export const CONFIG: Record<string, { key: string; label: string }[]> = {
 };
 
 /** Ad integrations whose lead sync is built. Flip when Meta / Google intake ships. */
-const BUILT = { meta: false, google: false };
+const BUILT = { meta: false, google: true };
 
 const plural = (n: number, one: string, many = `${one}s`) => `${n.toLocaleString("en-US")} ${n === 1 ? one : many}`;
 const after = (a: string | null, b: string | null) => Boolean(a) && (!b || Date.parse(a!) > Date.parse(b));
@@ -157,7 +160,7 @@ function webhook(
     { label: "Retries 7 days", value: s?.retries_7d ?? 0 },
   ];
   if (key === "call") stats.push({ label: "Blocked caller ID 7 days", value: s?.no_contact_7d ?? 0 });
-  const base = { key, name, stats, config: items, problem };
+  const base = { key, name, stats, config: items, problem, href: key === "google" ? "/admin/google" : undefined };
 
   const absent = missing(items);
   if (absent.length) return { ...base, state: "setup", summary: `Waiting for: ${absent.join(", ")}.` };

@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { Alert, Badge, Card, PageHeader } from "@/components/ui";
 import { buildIntegrations, overallState, type HealthReport, type HealthState, type Integration } from "@/lib/admin/health";
 import { getProfile } from "@/lib/auth";
+import { getConnection } from "@/lib/google/ads";
 import { serverEnv } from "@/lib/env";
 import { formatDateTime, timeAgo } from "@/lib/format";
 import { createClient } from "@/lib/supabase/server";
@@ -59,7 +60,8 @@ export default async function AdminPage({ searchParams }: PageProps<"/admin">) {
   }
   const r = report as HealthReport;
   const env = serverEnv() as Record<string, unknown>;
-  const integrations = buildIntegrations(r, (key) => Boolean(env[key]));
+  const googleConnected = Boolean(await getConnection());
+  const integrations = buildIntegrations(r, (key) => (key === "GOOGLE_ADS_CONNECTION" ? googleConnected : Boolean(env[key])));
   const overall = overallState(integrations);
   const ago = (iso: string | null | undefined) => (iso ? timeAgo(iso, TZ) : "—");
 
@@ -203,6 +205,11 @@ function IntegrationCard({ integration: i, ago }: { integration: Integration; ag
           </p>
           {i.problem.error ? <p className="mt-0.5 break-words">{i.problem.error}</p> : null}
         </div>
+      ) : null}
+      {i.href ? (
+        <Link href={i.href} className="mt-4 text-sm font-medium text-brand-700 hover:underline">
+          Manage {i.name} →
+        </Link>
       ) : null}
       {i.config ? (
         <ul className="mt-4 space-y-1 border-t border-slate-100 pt-3 text-xs">

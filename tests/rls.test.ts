@@ -262,6 +262,37 @@ describe.skipIf(!configured)("row-level security", () => {
     }
   });
 
+  it("ad accounts, spend and platform sign-ins: members read their own, keys and sign-ins stay server-side", async () => {
+    const acct = await admin
+      .from("ad_accounts")
+      .insert({ workspace_id: wsA, platform: "google", external_id: `99${Date.now()}`, name: "Test account" })
+      .select("id, webhook_key")
+      .single();
+    expect(acct.error).toBeNull();
+    expect(acct.data!.webhook_key).toMatch(/^[0-9a-f]{48}$/);
+    const spend = await admin
+      .from("ad_spend_daily")
+      .insert({ workspace_id: wsA, platform: "google", account_external_id: "1", campaign_id: `c-${run}`, date: "2026-10-01", cost: 12.5 })
+      .select("id")
+      .single();
+    expect(spend.error).toBeNull();
+
+    expect((await staffA.client.from("ad_accounts").select("id, name").eq("id", acct.data!.id)).data).toHaveLength(1);
+    // The webhook key column is not readable by anyone signed in, not even the owner.
+    expect((await ownerA.client.from("ad_accounts").select("webhook_key").eq("id", acct.data!.id)).error).not.toBeNull();
+    expect((await ownerA.client.from("ad_accounts").select("*").eq("id", acct.data!.id)).error).not.toBeNull();
+    expect((await ownerB.client.from("ad_accounts").select("id").eq("id", acct.data!.id)).data).toEqual([]);
+    expect((await ownerA.client.from("ad_accounts").insert({ workspace_id: wsA, platform: "google", external_id: "1" })).error).not.toBeNull();
+
+    expect((await staffA.client.from("ad_spend_daily").select("cost").eq("id", spend.data!.id)).data).toEqual([{ cost: 12.5 }]);
+    expect((await ownerB.client.from("ad_spend_daily").select("id").eq("id", spend.data!.id)).data).toEqual([]);
+    expect((await ownerA.client.from("ad_spend_daily").insert({ workspace_id: wsA, platform: "google", account_external_id: "1", campaign_id: "x", date: "2026-10-02" })).error).not.toBeNull();
+
+    // Platform sign-ins: no client role can read or write them.
+    expect((await ownerA.client.from("platform_connections").select("*")).data ?? []).toEqual([]);
+    expect((await ownerA.client.from("platform_connections").insert({ provider: "meta", secret_ciphertext: "x" })).error).not.toBeNull();
+  });
+
   it("ZIP lookup: readable by any signed-in user, not writable, and finds real ZIPs", async () => {
     const miami = await ownerA.client.rpc("zip_city_matches", { p_city: "miami", p_state: "FL" });
     expect(miami.data).toHaveLength(1);

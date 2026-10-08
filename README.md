@@ -62,6 +62,14 @@ Landing pages (`/landing-pages`) are template + JSON content (`src/lib/landing/c
 
 Agency-model credentials (server env, all optional until that integration is used): `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_ADS_DEVELOPER_TOKEN`, `GOOGLE_ADS_MANAGER_ID`, `GOOGLE_ADS_REFRESH_TOKEN`, `META_APP_ID`, `META_APP_SECRET`, `META_SYSTEM_USER_TOKEN`, `META_BUSINESS_ID`.
 
+### Google Ads (M2)
+
+Agency model: one Google user with access to the Lead96 manager account signs in once at **Admin → Google Ads** (`/api/google/connect` → `/api/google/callback`). The refresh token is stored AES-256-GCM encrypted in `platform_connections` (key: `CREDENTIALS_ENCRYPTION_KEY`; changing the key means reconnecting). Local and live share the database, so connecting once works for both as long as they use the same key. Each ad account under the manager account is assigned to a business (`ad_accounts`).
+
+- **Real-time leads:** each assigned account has a webhook URL `/api/intake/google-lead/<account id>` and key, pasted into the lead form in Google Ads (Lead delivery → Webhook). Test leads are logged, not stored.
+- **Daily sync:** `/api/cron/google-sync` (Vercel Cron, `vercel.json`, protected by `CRON_SECRET`) pulls lead-form submissions (catch-up) and 3 days of campaign spend into `ad_spend_daily`; **Sync now** in Admin pulls 30 days.
+- API calls are plain REST (`src/lib/google/ads.ts`, version `GOOGLE_ADS_API_VERSION`, default v25); mapping is in `src/lib/google/leads.ts`.
+
 ### ZIP code data
 
 `public.us_zip_codes` holds ~41k US ZIPs with city, state and coordinates, from [GeoNames](https://www.geonames.org) postal codes (CC BY 4.0 — keep the attribution). The CSV is in `supabase/seed/us_zip_codes.csv`; load it with `npm run db:seed:zips` after the migration (idempotent). The setup chat uses `zip_city_matches` / `zips_within` to turn "Miami, 20 miles" into a ZIP list — the AI never generates ZIP codes.

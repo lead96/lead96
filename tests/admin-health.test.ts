@@ -39,9 +39,11 @@ describe("integration health", () => {
     const set = new Set(["GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET"]);
     const g = get(empty, "google", (k) => set.has(k));
     expect(g.state).toBe("setup");
-    expect(g.summary).toBe("Waiting for: Google Ads developer token, Manager account (MCC) ID, admin@lead96.com sign-in.");
+    expect(g.summary).toBe("Waiting for: Google Ads developer token, Manager account (MCC) ID, Encryption key for stored sign-ins, Google Ads sign-in (Admin → Google Ads).");
     expect(g.config!.filter((c) => c.set).map((c) => c.key)).toEqual(["GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET"]);
     expect(get(empty, "meta").summary).toContain("Lead sync is being built");
+    // Everything set and signed in: Google is built, so it is ready (no leads yet), with a settings link.
+    expect(get(empty, "google")).toMatchObject({ state: "idle", summary: "Ready. No leads received yet.", href: "/admin/google" });
   });
 
   it("landing pages, CSV and OpenAI reflect activity", () => {
