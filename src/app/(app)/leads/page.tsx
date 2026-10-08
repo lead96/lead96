@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { Metadata } from "next";
-import { Badge, Card, Input, PageHeader, Select, buttonClass } from "@/components/ui";
+import { Inbox, Phone, SearchX } from "lucide-react";
+import { Badge, Card, EmptyState, Input, PageHeader, Select, buttonClass } from "@/components/ui";
 import { requireWorkspace } from "@/lib/auth";
 import { formatPhone, timeAgo } from "@/lib/format";
 import { CUSTOMER_STATUSES, LEAD_SOURCES, SOURCE_LABELS, STATUS_LABELS, STATUS_TONES, type CustomerStatus, type LeadSource } from "@/lib/leads/normalize";
@@ -26,6 +27,7 @@ type LatestLead = { customer_id: string; source: LeadSource; kind: string; campa
 
 export default async function LeadsPage({ searchParams }: PageProps<"/leads">) {
   const workspace = await requireWorkspace();
+  const isOwner = workspace.role === "owner";
   const sp = await searchParams;
   const q = typeof sp.q === "string" ? sp.q.trim().slice(0, 100) : "";
   const status = CUSTOMER_STATUSES.find((s) => s === sp.status);
@@ -78,20 +80,22 @@ export default async function LeadsPage({ searchParams }: PageProps<"/leads">) {
         title="Leads"
         description="Every lead and call, one row per customer. Duplicates are merged automatically."
         actions={
-          <div className="flex gap-2">
-            <Link href="/leads/import" className={buttonClass("secondary")}>
-              Import CSV
-            </Link>
+          <>
+            {isOwner ? (
+              <Link href="/leads/import" className={buttonClass("secondary")}>
+                Import CSV
+              </Link>
+            ) : null}
             <Link href="/leads/new" className={buttonClass()}>
               Add lead
             </Link>
-          </div>
+          </>
         }
       />
 
-      <form className="mb-4 flex flex-wrap gap-2" role="search">
-        <Input name="q" defaultValue={q} placeholder="Search name, phone or email" aria-label="Search" className="w-64 max-w-full" />
-        <Select name="status" defaultValue={status ?? ""} aria-label="Status" className="w-40">
+      <form className="mb-6 grid grid-cols-2 gap-2 sm:flex sm:flex-wrap" role="search">
+        <Input name="q" defaultValue={q} placeholder="Search name, phone or email" aria-label="Search" className="col-span-2 sm:w-64" />
+        <Select name="status" defaultValue={status ?? ""} aria-label="Status" className="sm:w-40">
           <option value="">All statuses</option>
           {CUSTOMER_STATUSES.map((s) => (
             <option key={s} value={s}>
@@ -99,7 +103,7 @@ export default async function LeadsPage({ searchParams }: PageProps<"/leads">) {
             </option>
           ))}
         </Select>
-        <Select name="source" defaultValue={source ?? ""} aria-label="Source" className="w-40">
+        <Select name="source" defaultValue={source ?? ""} aria-label="Source" className="sm:w-40">
           <option value="">All sources</option>
           {LEAD_SOURCES.map((s) => (
             <option key={s} value={s}>
@@ -107,7 +111,7 @@ export default async function LeadsPage({ searchParams }: PageProps<"/leads">) {
             </option>
           ))}
         </Select>
-        <button type="submit" className={buttonClass("secondary")}>
+        <button type="submit" className={buttonClass("secondary", filtered ? "" : "col-span-2")}>
           Filter
         </button>
         {filtered ? (
@@ -117,64 +121,115 @@ export default async function LeadsPage({ searchParams }: PageProps<"/leads">) {
         ) : null}
       </form>
 
-      <Card className="overflow-x-auto">
+      <Card className="overflow-hidden">
         {rows.length === 0 ? (
-          <div className="p-10 text-center text-sm text-slate-500">
-            {filtered ? "No leads match these filters." : "No leads yet. They appear here as soon as your landing pages or ad accounts send them."}
-          </div>
+          filtered ? (
+            <EmptyState
+              icon={SearchX}
+              title="No leads match these filters."
+              description="Try another name, phone number or filter."
+              actions={[{ href: "/leads", label: "Clear filters", variant: "secondary" }]}
+            />
+          ) : (
+            <EmptyState
+              icon={Inbox}
+              title="No leads yet"
+              description="Leads and calls appear here as soon as your landing pages, ad accounts or imports send them. Duplicates are merged automatically."
+              actions={[
+                ...(isOwner ? [{ href: "/landing-pages", label: "Create a landing page" }] : []),
+                { href: "/leads/new", label: "Add lead", variant: isOwner ? ("secondary" as const) : ("primary" as const) },
+                ...(isOwner ? [{ href: "/leads/import", label: "Import CSV", variant: "secondary" as const }] : []),
+              ]}
+            />
+          )
         ) : (
-          <table className="w-full min-w-[760px] text-left text-sm">
-            <thead className="border-b border-slate-200 text-xs uppercase tracking-wide text-slate-500">
-              <tr>
-                <th className="px-4 py-2.5 font-medium">Customer</th>
-                <th className="px-4 py-2.5 font-medium">Service · ZIP</th>
-                <th className="px-4 py-2.5 font-medium">Source</th>
-                <th className="px-4 py-2.5 font-medium">Status</th>
-                <th className="px-4 py-2.5 text-right font-medium">Leads</th>
-                <th className="px-4 py-2.5 text-right font-medium">Last activity</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
+          <>
+            {/* Phones: one card per customer. */}
+            <ul className="divide-y divide-slate-100 md:hidden">
               {rows.map((r) => {
                 const l = latest.get(r.id);
-                const campaign = l?.campaign_name ?? l?.utm_campaign ?? l?.keyword;
                 return (
-                  <tr key={r.id} className="hover:bg-slate-50">
-                    <td className="px-4 py-2.5">
-                      <Link href={`/leads/${r.id}`} className="font-medium text-slate-900 hover:text-brand-700 hover:underline">
-                        {r.full_name || formatPhone(r.phone) || r.email}
-                      </Link>
-                      <div className="text-xs text-slate-500">{[formatPhone(r.phone), r.email].filter(Boolean).join(" · ")}</div>
-                    </td>
-                    <td className="px-4 py-2.5 text-slate-700">{[serviceLabel(r.service), r.zip].filter(Boolean).join(" · ") || "—"}</td>
-                    <td className="px-4 py-2.5">
-                      {l ? (
-                        <>
-                          <Badge tone={l.source === "google" ? "amber" : l.source === "meta" ? "blue" : "slate"}>
-                            {l.kind === "call" ? "📞 " : ""}
-                            {SOURCE_LABELS[l.source]}
-                          </Badge>
-                          {campaign ? <div className="mt-0.5 max-w-[220px] truncate text-xs text-slate-500">{campaign}</div> : null}
-                        </>
-                      ) : (
-                        "—"
-                      )}
-                    </td>
-                    <td className="px-4 py-2.5">
-                      <Badge tone={STATUS_TONES[r.status]}>{STATUS_LABELS[r.status]}</Badge>
-                    </td>
-                    <td className="px-4 py-2.5 text-right tabular-nums text-slate-700">{r.lead_count}</td>
-                    <td className="px-4 py-2.5 text-right text-slate-500">{r.last_lead_at ? timeAgo(r.last_lead_at, workspace.timezone) : "—"}</td>
-                  </tr>
+                  <li key={r.id}>
+                    <Link href={`/leads/${r.id}`} className="block px-4 py-3 active:bg-slate-50">
+                      <span className="flex items-start justify-between gap-3">
+                        <span className="min-w-0">
+                          <span className="block truncate font-medium text-slate-900">{r.full_name || formatPhone(r.phone) || r.email}</span>
+                          <span className="block truncate text-xs text-slate-500">{[formatPhone(r.phone), r.email].filter(Boolean).join(" · ")}</span>
+                        </span>
+                        <Badge tone={STATUS_TONES[r.status]}>{STATUS_LABELS[r.status]}</Badge>
+                      </span>
+                      <span className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-slate-500">
+                        {l ? <SourceBadge source={l.source} call={l.kind === "call"} /> : null}
+                        {[serviceLabel(r.service), r.zip].filter(Boolean).join(" · ")}
+                        <span className="ml-auto">{r.last_lead_at ? timeAgo(r.last_lead_at, workspace.timezone) : ""}</span>
+                      </span>
+                    </Link>
+                  </li>
                 );
               })}
-            </tbody>
-          </table>
+            </ul>
+
+            <div className="hidden overflow-x-auto md:block">
+              <table className="w-full min-w-[760px] text-left text-sm">
+                <thead className="border-b border-slate-200 text-xs uppercase tracking-wide text-slate-500">
+                  <tr>
+                    <th className="px-4 py-3 font-medium">Customer</th>
+                    <th className="px-4 py-3 font-medium">Service · ZIP</th>
+                    <th className="px-4 py-3 font-medium">Source</th>
+                    <th className="px-4 py-3 font-medium">Status</th>
+                    <th className="px-4 py-3 text-right font-medium">Leads</th>
+                    <th className="px-4 py-3 text-right font-medium">Last activity</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {rows.map((r) => {
+                    const l = latest.get(r.id);
+                    const campaign = l?.campaign_name ?? l?.utm_campaign ?? l?.keyword;
+                    return (
+                      <tr key={r.id} className="hover:bg-slate-50">
+                        <td className="px-4 py-3">
+                          <Link href={`/leads/${r.id}`} className="font-medium text-slate-900 hover:text-brand-700 hover:underline">
+                            {r.full_name || formatPhone(r.phone) || r.email}
+                          </Link>
+                          <div className="text-xs text-slate-500">{[formatPhone(r.phone), r.email].filter(Boolean).join(" · ")}</div>
+                        </td>
+                        <td className="px-4 py-3 text-slate-700">{[serviceLabel(r.service), r.zip].filter(Boolean).join(" · ") || "—"}</td>
+                        <td className="px-4 py-3">
+                          {l ? (
+                            <>
+                              <SourceBadge source={l.source} call={l.kind === "call"} />
+                              {campaign ? <div className="mt-0.5 max-w-[220px] truncate text-xs text-slate-500">{campaign}</div> : null}
+                            </>
+                          ) : (
+                            "—"
+                          )}
+                        </td>
+                        <td className="px-4 py-3">
+                          <Badge tone={STATUS_TONES[r.status]}>{STATUS_LABELS[r.status]}</Badge>
+                        </td>
+                        <td className="px-4 py-3 text-right tabular-nums text-slate-700">{r.lead_count}</td>
+                        <td className="px-4 py-3 text-right text-slate-500">{r.last_lead_at ? timeAgo(r.last_lead_at, workspace.timezone) : "—"}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </>
         )}
       </Card>
       {count && count > PAGE_SIZE ? (
         <p className="mt-3 text-xs text-slate-500">Showing the {PAGE_SIZE} most recent of {count}. Use search or filters to narrow down.</p>
       ) : null}
     </>
+  );
+}
+
+function SourceBadge({ source, call }: { source: LeadSource; call: boolean }) {
+  return (
+    <Badge tone="slate">
+      {call ? <Phone size={12} className="mr-1" aria-label="Call" /> : null}
+      {SOURCE_LABELS[source]}
+    </Badge>
   );
 }

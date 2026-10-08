@@ -30,15 +30,16 @@ export const STATUS_LABELS: Record<CustomerStatus, string> = {
   lost: "Lost",
 };
 
-export const STATUS_TONES: Record<CustomerStatus, "slate" | "blue" | "green" | "amber" | "red" | "violet"> = {
+// Kept to the brand palette: blue = in progress, green = won, gray = not started / closed.
+export const STATUS_TONES: Record<CustomerStatus, "slate" | "blue" | "green"> = {
   new: "blue",
   contacted: "slate",
-  qualified: "violet",
-  appointment: "amber",
-  showed: "amber",
-  estimate: "amber",
+  qualified: "blue",
+  appointment: "blue",
+  showed: "blue",
+  estimate: "blue",
   won: "green",
-  lost: "red",
+  lost: "slate",
 };
 
 export type RawLead = {

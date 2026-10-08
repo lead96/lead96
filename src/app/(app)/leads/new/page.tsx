@@ -1,4 +1,3 @@
-import Link from "next/link";
 import type { Metadata } from "next";
 import { Card, PageHeader } from "@/components/ui";
 import { requireWorkspace } from "@/lib/auth";
@@ -17,11 +16,7 @@ export default async function NewLeadPage() {
       <PageHeader
         title="Add lead"
         description="For leads that come in another way — a walk-in, a referral, a call to your own number."
-        actions={
-          <Link href="/leads" className="text-sm text-slate-600 hover:underline">
-            Back to leads
-          </Link>
-        }
+        back={{ href: "/leads", label: "Leads" }}
       />
       <Card className="max-w-xl p-6">
         <ManualLeadForm services={ctx.services} />

@@ -99,7 +99,7 @@ export function Importer({ timezone }: { timezone: string }) {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       <Card className="overflow-x-auto">
         <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 px-5 py-3">
           <h2 className="font-semibold text-slate-900">

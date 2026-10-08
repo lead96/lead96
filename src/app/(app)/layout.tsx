@@ -1,40 +1,61 @@
-import { logout } from "@/app/(auth)/actions";
+import Link from "next/link";
+import { ListChecks } from "lucide-react";
 import { Logo } from "@/components/logo";
 import { getProfile, requireWorkspace } from "@/lib/auth";
-import { SidebarNav } from "./sidebar-nav";
+import { MobileNav } from "./mobile-nav";
+import { ProfileMenu } from "./profile-menu";
+import { SidebarContent } from "./sidebar-nav";
+import { TopSearch } from "./top-search";
 
 export default async function AppLayout({ children }: LayoutProps<"/">) {
   const [workspace, profile] = await Promise.all([requireWorkspace(), getProfile()]);
-  const showSetup = workspace.role === "owner" && !workspace.setupCompletedAt;
+  const nav = {
+    showSetup: workspace.role === "owner" && !workspace.setupCompletedAt,
+    isAdmin: Boolean(profile?.is_platform_admin),
+    isOwner: workspace.role === "owner",
+    workspaceName: workspace.name,
+    role: workspace.role,
+  };
+  const email = profile?.email ?? "";
+  const name = profile?.full_name?.trim() || email.split("@")[0] || "Account";
 
   return (
     <div className="flex min-h-screen">
-      <aside className="hidden w-60 shrink-0 flex-col bg-ink md:flex">
-        <div className="px-5 py-5">
-          <Logo on="dark" height={26} href="/dashboard" />
+      <aside className="hidden w-64 shrink-0 border-r border-slate-200/80 bg-white md:block">
+        <div className="sticky top-0 flex h-screen flex-col">
+          <div className="px-6 py-5">
+            <Logo height={26} href="/dashboard" />
+          </div>
+          <SidebarContent {...nav} />
         </div>
-        <SidebarNav showSetup={showSetup} isAdmin={Boolean(profile?.is_platform_admin)} />
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="flex items-center justify-between gap-4 border-b border-slate-200 bg-white px-4 py-3 md:px-6">
-          <div className="min-w-0">
-            <div className="truncate text-sm font-semibold text-slate-900">{workspace.name}</div>
-            <div className="text-xs capitalize text-slate-500">{workspace.role}</div>
+        <header className="sticky top-0 z-30 flex h-16 items-center gap-3 border-b border-slate-200/80 bg-white/95 px-4 backdrop-blur-sm md:px-10">
+          <MobileNav {...nav} />
+          <div className="md:hidden">
+            <Logo height={22} href="/dashboard" />
           </div>
-          <div className="flex items-center gap-3">
-            <span className="hidden text-sm text-slate-600 sm:inline">{profile?.email}</span>
-            <form action={logout}>
-              <button type="submit" className="text-sm text-slate-600 hover:text-slate-900">
-                Sign out
-              </button>
-            </form>
+
+          <TopSearch />
+
+          <div className="ml-auto flex items-center gap-2">
+            {nav.showSetup ? (
+              <Link
+                href="/setup"
+                className="hidden items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-sm font-medium text-emerald-700 hover:bg-emerald-100 sm:inline-flex"
+              >
+                <ListChecks size={16} aria-hidden />
+                Finish setup
+              </Link>
+            ) : null}
+            <ProfileMenu name={name} email={email} workspaceName={workspace.name} role={workspace.role} isAdmin={nav.isAdmin} />
           </div>
         </header>
-        <div className="border-b border-slate-200 bg-white md:hidden">
-          <SidebarNav showSetup={showSetup} isAdmin={Boolean(profile?.is_platform_admin)} horizontal />
-        </div>
-        <main className="flex-1 px-4 py-6 md:px-8">{children}</main>
+
+        <main className="flex-1 px-5 py-8 md:px-10 md:py-10">
+          <div className="mx-auto w-full max-w-[1200px]">{children}</div>
+        </main>
       </div>
     </div>
   );

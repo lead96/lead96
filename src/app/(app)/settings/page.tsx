@@ -33,7 +33,7 @@ export default async function SettingsPage() {
     <>
       <PageHeader title="Settings" description="Business details and team." />
 
-      <div className="grid gap-6 lg:grid-cols-2">
+      <div className="grid items-start gap-6 lg:grid-cols-2 lg:gap-8">
         <Card className="p-6">
           <h2 className="mb-4 font-semibold text-slate-900">Business</h2>
           {business ? <BusinessForm business={business} disabled={!isOwner} /> : null}

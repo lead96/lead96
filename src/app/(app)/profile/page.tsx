@@ -46,7 +46,7 @@ export default async function ProfilePage({ searchParams }: PageProps<"/profile"
         }
       />
 
-      <div className="space-y-6">
+      <div className="space-y-8">
         {savedParam === "setup" ? (
           <Alert tone={planParam === "failed" ? "info" : "success"}>
             {planParam === "failed"

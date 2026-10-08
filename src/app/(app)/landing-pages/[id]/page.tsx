@@ -1,4 +1,3 @@
-import Link from "next/link";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { PageHeader } from "@/components/ui";
@@ -30,11 +29,7 @@ export default async function EditLandingPage({ params }: PageProps<"/landing-pa
     <>
       <PageHeader
         title={page.name}
-        actions={
-          <Link href="/landing-pages" className="text-sm text-slate-600 hover:underline">
-            Back to landing pages
-          </Link>
-        }
+        back={{ href: "/landing-pages", label: "Landing pages" }}
       />
       <LandingEditor
         page={{ id: page.id, name: page.name, slug: page.slug, template, status: page.status as "draft" | "published" }}

@@ -76,7 +76,7 @@ export default async function AdminPage({ searchParams }: PageProps<"/admin">) {
         }
       />
 
-      <div className="space-y-6">
+      <div className="space-y-8">
         <section aria-labelledby="health-h">
           <h2 id="health-h" className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-500">
             Integration health

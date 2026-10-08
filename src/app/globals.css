@@ -4,7 +4,8 @@
  * Lead96 brand (from the brand sheet in public/Logo):
  *   Electric Blue #3B82F6 · Purple #8B5CF6 · Mint #10B981 · Dark #0B0F19
  * Blue is the action colour. Purple appears only as the gradient end in the
- * logo mark and a thin accent. Mint = success. Dark = sidebar / dark surfaces.
+ * logo mark and a thin accent. Mint = success. Dark = text on light surfaces.
+ * Look: light SaaS — white sidebar and cards on a pale gray page, soft shadows, no effects.
  */
 @theme {
   --color-brand-50: #eff6ff;
@@ -15,10 +16,13 @@
   --color-brand-900: #1e3a8a;
   --color-accent-600: #8b5cf6;
   --color-ink: #0b0f19;
+  --color-page: #f6f7f9;
+  --shadow-card: 0 1px 2px rgb(16 24 40 / 0.04), 0 1px 3px rgb(16 24 40 / 0.03);
+  --shadow-menu: 0 10px 30px -10px rgb(16 24 40 / 0.18), 0 2px 6px rgb(16 24 40 / 0.06);
   --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
 }
 
 body {
-  background: #f8fafc;
+  background: var(--color-page);
   color: #0f172a;
 }

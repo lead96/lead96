@@ -1,4 +1,3 @@
-import Link from "next/link";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { Alert, Badge, Card, PageHeader } from "@/components/ui";
@@ -136,16 +135,12 @@ export default async function CustomerPage({ params }: PageProps<"/leads/[id]">)
       <PageHeader
         title={title ?? "Customer"}
         description={[serviceLabel(customer.service), customer.zip].filter(Boolean).join(" · ") || undefined}
-        actions={
-          <Link href="/leads" className="text-sm text-slate-600 hover:underline">
-            Back to leads
-          </Link>
-        }
+        back={{ href: "/leads", label: "Leads" }}
       />
 
-      <div className="grid gap-6 lg:grid-cols-[340px_minmax(0,1fr)]">
-        <div className="space-y-6">
-          <Card className="p-5">
+      <div className="grid items-start gap-6 lg:grid-cols-[360px_minmax(0,1fr)] lg:gap-8">
+        <div className="space-y-6 lg:space-y-8">
+          <Card className="p-6">
             <div className="mb-4 flex items-center justify-between">
               <h2 className="font-semibold text-slate-900">Contact</h2>
               <Badge tone={STATUS_TONES[customer.status as CustomerStatus]}>{STATUS_LABELS[customer.status as CustomerStatus]}</Badge>
@@ -164,13 +159,13 @@ export default async function CustomerPage({ params }: PageProps<"/leads/[id]">)
             </div>
           </Card>
 
-          <Card className="p-5">
+          <Card className="p-6">
             <h2 className="mb-3 font-semibold text-slate-900">Notes</h2>
             <NotesForm customerId={customer.id} notes={customer.notes ?? ""} />
           </Card>
 
           {latest ? (
-            <Card className="p-5">
+            <Card className="p-6">
               <h2 className="mb-3 font-semibold text-slate-900">Latest source</h2>
               {!latest.attribution_complete ? (
                 <div className="mb-3">
@@ -194,7 +189,7 @@ export default async function CustomerPage({ params }: PageProps<"/leads/[id]">)
           ) : null}
         </div>
 
-        <Card className="p-5">
+        <Card className="p-6">
           <h2 className="mb-4 font-semibold text-slate-900">Timeline</h2>
           <ol className="relative space-y-5 border-l border-slate-200 pl-5">
             {timeline.map((e) => {

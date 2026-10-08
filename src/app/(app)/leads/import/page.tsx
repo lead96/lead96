@@ -1,4 +1,3 @@
-import Link from "next/link";
 import type { Metadata } from "next";
 import { Alert, Card, PageHeader } from "@/components/ui";
 import { requireWorkspace } from "@/lib/auth";
@@ -14,11 +13,7 @@ export default async function ImportLeadsPage() {
       <PageHeader
         title="Import leads"
         description="Bring in leads from a spreadsheet or your old CRM. People already in Lead96 are matched by phone or email, not added twice."
-        actions={
-          <Link href="/leads" className="text-sm text-slate-600 hover:underline">
-            Back to leads
-          </Link>
-        }
+        back={{ href: "/leads", label: "Leads" }}
       />
       {workspace.role === "owner" ? (
         <Importer timezone={workspace.timezone} />
