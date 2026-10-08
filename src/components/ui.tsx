@@ -120,6 +120,6 @@ const badgeTones = {
 
 export function Badge({ tone = "slate", children }: { tone?: keyof typeof badgeTones; children: ReactNode }) {
   return (
-    <span className={cx("inline-flex items-center rounded px-1.5 py-0.5 text-xs font-medium", badgeTones[tone])}>{children}</span>
+    <span className={cx("inline-flex shrink-0 items-center whitespace-nowrap rounded px-1.5 py-0.5 text-xs font-medium", badgeTones[tone])}>{children}</span>
   );
 }

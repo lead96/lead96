@@ -56,6 +56,12 @@ Landing pages (`/landing-pages`) are template + JSON content (`src/lib/landing/c
 
 `POST /api/intake/call` receives calls (payload v1 in `src/lib/intake/call.ts`). Requests must be signed: `X-Lead96-Timestamp: <unix seconds>` and `X-Lead96-Signature: v1=<hex HMAC-SHA256(INTAKE_SIGNING_SECRET, "<timestamp>.<body>")>` (`src/lib/intake/signature.ts`). Responses: 200 stored or already stored · 401 bad signature · 422 invalid / no caller number (don't retry) · 500 retry. Every signed delivery is logged in `webhook_deliveries`. Send a test call with `npm run intake:test-call -- --workspace <id>`.
 
+### Admin and integration health
+
+`/admin` is for platform admins (`profiles.is_platform_admin`, set in the database — users can't set it themselves). It shows a health card per integration built from `admin_integration_health()` (aggregates only) and the rules in `src/lib/admin/health.ts`, which credentials are set (names only, from env), a per-business table and the webhook delivery feed. **Run live checks** (`src/lib/admin/checks.ts`) calls each service with a free, read-only request. When Meta or Google lead sync ships, flip `BUILT` in `health.ts`.
+
+Agency-model credentials (server env, all optional until that integration is used): `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_ADS_DEVELOPER_TOKEN`, `GOOGLE_ADS_MANAGER_ID`, `GOOGLE_ADS_REFRESH_TOKEN`, `META_APP_ID`, `META_APP_SECRET`, `META_SYSTEM_USER_TOKEN`, `META_BUSINESS_ID`.
+
 ### ZIP code data
 
 `public.us_zip_codes` holds ~41k US ZIPs with city, state and coordinates, from [GeoNames](https://www.geonames.org) postal codes (CC BY 4.0 — keep the attribution). The CSV is in `supabase/seed/us_zip_codes.csv`; load it with `npm run db:seed:zips` after the migration (idempotent). The setup chat uses `zip_city_matches` / `zips_within` to turn "Miami, 20 miles" into a ZIP list — the AI never generates ZIP codes.

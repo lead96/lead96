@@ -229,6 +229,39 @@ describe.skipIf(!configured)("row-level security", () => {
     expect((await admin.from("webhook_deliveries").select("id").eq("id", seeded.data!.id)).data).toHaveLength(1);
   });
 
+  it("integration health: platform admins only, and it counts real deliveries", async () => {
+    expect((await ownerA.client.rpc("admin_integration_health")).error).not.toBeNull();
+    expect((await staffA.client.rpc("admin_integration_health")).error).not.toBeNull();
+
+    const seeded = await admin.from("webhook_deliveries").insert(
+      [
+        { provider: "call", external_id: `h1-${run}`, workspace_id: wsA, status: "processed" },
+        { provider: "call", external_id: `h1-${run}`, workspace_id: wsA, status: "duplicate", attempt: 2 },
+        { provider: "call", external_id: `h2-${run}`, workspace_id: wsA, status: "failed", error: "db down" },
+        { provider: "call", external_id: `h3-${run}`, workspace_id: wsA, status: "rejected", error: "no caller number or email" },
+      ],
+      { defaultToNull: false }, // rows without "attempt" get the column default, not null
+    );
+    expect(seeded.error).toBeNull();
+    const platform = await makeUser(admin, "platform");
+    try {
+      await admin.from("profiles").update({ is_platform_admin: true }).eq("id", platform.id);
+      const { data, error } = await platform.client.rpc("admin_integration_health");
+      expect(error).toBeNull();
+      const call = data.deliveries.call;
+      // Other tests may have left deliveries too; ours must be counted.
+      expect(call.ok_24h).toBeGreaterThanOrEqual(2);
+      expect(call.failed_24h).toBeGreaterThanOrEqual(1);
+      expect(call.retries_7d).toBeGreaterThanOrEqual(1);
+      expect(call.no_contact_7d).toBeGreaterThanOrEqual(1);
+      const a = data.workspaces.find((w: { id: string }) => w.id === wsA);
+      expect(a).toMatchObject({ problems_7d: 1 }); // the blocked caller ID is not a problem
+      expect(data.workspaces.some((w: { id: string }) => w.id === wsB)).toBe(true);
+    } finally {
+      await admin.auth.admin.deleteUser(platform.id);
+    }
+  });
+
   it("ZIP lookup: readable by any signed-in user, not writable, and finds real ZIPs", async () => {
     const miami = await ownerA.client.rpc("zip_city_matches", { p_city: "miami", p_state: "FL" });
     expect(miami.data).toHaveLength(1);
