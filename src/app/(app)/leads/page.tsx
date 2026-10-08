@@ -78,9 +78,14 @@ export default async function LeadsPage({ searchParams }: PageProps<"/leads">) {
         title="Leads"
         description="Every lead and call, one row per customer. Duplicates are merged automatically."
         actions={
-          <Link href="/leads/new" className={buttonClass()}>
-            Add lead
-          </Link>
+          <div className="flex gap-2">
+            <Link href="/leads/import" className={buttonClass("secondary")}>
+              Import CSV
+            </Link>
+            <Link href="/leads/new" className={buttonClass()}>
+              Add lead
+            </Link>
+          </div>
         }
       />
 

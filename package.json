@@ -12,7 +12,8 @@
     "db:push": "supabase db push",
     "db:types": "supabase gen types typescript --linked > src/lib/supabase/database.types.ts",
     "db:push:https": "node scripts/db-push-https.mjs",
-    "db:seed:zips": "node scripts/seed-zips.mjs"
+    "db:seed:zips": "node scripts/seed-zips.mjs",
+    "intake:test-call": "node scripts/send-test-call.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.7",

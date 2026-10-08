@@ -130,6 +130,32 @@ describe.skipIf(!configured)("lead intake and CRM", () => {
     expect(ev).toEqual([{ payload: { from: "new", to: "contacted", reason: "called back" }, actor_id: staffA.id }]);
   });
 
+  it("bulk ingest: one call for many rows, bad rows reported without failing the rest, re-imports recognized", async () => {
+    const rows = [
+      { kind: "form", source: "csv", phone: "+13055550110", full_name: "Bulk One", external_id: `csv-a-${run}` },
+      { kind: "form", source: "csv", email: `bulk-${run}@example.com`, external_id: `csv-b-${run}`, received_at: "2026-09-01T16:00:00Z" },
+      // Fails the source check inside the database; must not take the other rows down with it.
+      { kind: "form", source: "nope", phone: "+13055550111", external_id: `csv-c-${run}` },
+      { kind: "form", source: "csv", phone: "+13055550110", external_id: `csv-d-${run}` }, // same person as row 1
+    // Already normalized, as ingestLeads() sends them.
+    ].map((r) => ({ workspace_id: wsA, attribution_complete: false, fields: {}, consent_given: false, ...r }));
+
+    const { data, error } = await admin.rpc("ingest_leads", { p: rows });
+    expect(error).toBeNull();
+    const res = data as ({ customer_id: string; customer_created: boolean; duplicate: boolean } | { error: string })[];
+    expect(res).toHaveLength(4);
+    expect(res[0]).toMatchObject({ customer_created: true, duplicate: false });
+    expect(res[1]).toMatchObject({ customer_created: true });
+    expect(res[2]).toHaveProperty("error");
+    expect(res[3]).toMatchObject({ customer_created: false, customer_id: (res[0] as { customer_id: string }).customer_id });
+    const { data: c } = await admin.from("customers").select("first_lead_at").eq("id", (res[1] as { customer_id: string }).customer_id).single();
+    expect(new Date(c!.first_lead_at).toISOString()).toBe("2026-09-01T16:00:00.000Z");
+
+    const again = (await admin.rpc("ingest_leads", { p: rows.slice(0, 2) })).data as { duplicate: boolean }[];
+    expect(again.map((r) => r.duplicate)).toEqual([true, true]);
+    expect((await ownerA.client.rpc("ingest_leads", { p: rows })).error).not.toBeNull();
+  });
+
   it("landing pages: owners edit, staff read only, slugs are global and validated", async () => {
     const slug = `cool-air-${run}`;
     const ins = await ownerA.client.from("landing_pages").insert({ workspace_id: wsA, name: "Main", slug, template: "call_first" }).select("id").single();

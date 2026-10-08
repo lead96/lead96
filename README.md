@@ -50,6 +50,12 @@ Every lead or call — from any source — goes through `ingestLead()` (`src/lib
 
 Landing pages (`/landing-pages`) are template + JSON content (`src/lib/landing/content.ts`), rendered by `src/components/landing/landing-page.tsx` both in the editor preview and publicly at `/p/{slug}`. Public submissions (`src/app/p/actions.ts`) store UTM/click IDs and a consent record; the consent text is versioned (`CONSENT_VERSION`).
 
+### Imports and call intake (M2)
+
+`/leads/import` (owners) imports a CSV: the browser parses it (`src/lib/leads/csv.ts`), the owner confirms the column mapping, and rows go to `importLeads` in chunks of 200 → `ingest_leads()` (one database call per chunk; a bad row is reported, not fatal). Each row's id is a hash of its content, so re-importing a file adds nothing.
+
+`POST /api/intake/call` receives calls (payload v1 in `src/lib/intake/call.ts`). Requests must be signed: `X-Lead96-Timestamp: <unix seconds>` and `X-Lead96-Signature: v1=<hex HMAC-SHA256(INTAKE_SIGNING_SECRET, "<timestamp>.<body>")>` (`src/lib/intake/signature.ts`). Responses: 200 stored or already stored · 401 bad signature · 422 invalid / no caller number (don't retry) · 500 retry. Every signed delivery is logged in `webhook_deliveries`. Send a test call with `npm run intake:test-call -- --workspace <id>`.
+
 ### ZIP code data
 
 `public.us_zip_codes` holds ~41k US ZIPs with city, state and coordinates, from [GeoNames](https://www.geonames.org) postal codes (CC BY 4.0 — keep the attribution). The CSV is in `supabase/seed/us_zip_codes.csv`; load it with `npm run db:seed:zips` after the migration (idempotent). The setup chat uses `zip_city_matches` / `zips_within` to turn "Miami, 20 miles" into a ZIP list — the AI never generates ZIP codes.
@@ -69,6 +75,7 @@ Owners invite from **Settings**. Until the email provider is set up, the owner c
 | `npm run db:push` | Apply migrations to the linked project |
 | `npm run db:push:https` | Same, through the Supabase Management API over HTTPS — use when a VPN blocks Postgres ports. Needs `SUPABASE_ACCESS_TOKEN` in `.env.local`. `-- --dry-run` lists pending migrations |
 | `npm run db:seed:zips` | Load the US ZIP code table from `supabase/seed/us_zip_codes.csv` |
+| `npm run intake:test-call` | Send a signed test call to `/api/intake/call` (`-- --workspace <id> [--url …] [--status missed] [--source google] [--call-id …]`) |
 | `npm run db:types` | Regenerate `src/lib/supabase/database.types.ts` |
 
 ## Layout

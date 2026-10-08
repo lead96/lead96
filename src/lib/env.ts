@@ -12,6 +12,8 @@ const serverSchema = publicSchema.extend({
   OPENAI_MODEL: z.string().min(1).default("gpt-4.1-mini"),
   /** Setup chat only interprets short answers, so a smaller, faster model is enough. */
   OPENAI_CHAT_MODEL: z.string().min(1).default("gpt-4.1-nano"),
+  /** Shared secret for signed webhooks into /api/intake/* (call intake). Intake is off when unset. */
+  INTAKE_SIGNING_SECRET: z.string().min(32).optional(),
 });
 
 // NEXT_PUBLIC_* values must be referenced literally so Next can inline them in the browser bundle.
@@ -30,5 +32,6 @@ export function serverEnv() {
     OPENAI_API_KEY: process.env.OPENAI_API_KEY || undefined,
     OPENAI_MODEL: process.env.OPENAI_MODEL || undefined,
     OPENAI_CHAT_MODEL: process.env.OPENAI_CHAT_MODEL || undefined,
+    INTAKE_SIGNING_SECRET: process.env.INTAKE_SIGNING_SECRET || undefined,
   });
 }

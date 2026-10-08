@@ -23,3 +23,34 @@ export async function ingestLead(raw: RawLead): Promise<IngestResult> {
   const r = data as { lead_id: string; customer_id: string; customer_created: boolean; duplicate: boolean };
   return { ok: true, leadId: r.lead_id, customerId: r.customer_id, customerCreated: r.customer_created, duplicate: r.duplicate };
 }
+
+export type BulkRowResult =
+  | { ok: true; customerId: string; customerCreated: boolean; duplicate: boolean }
+  | { ok: false; error: string };
+
+/** ingestLead for many rows in one database call (≤ 500). Results keep the input order. */
+export async function ingestLeads(raws: RawLead[]): Promise<BulkRowResult[]> {
+  const results: (BulkRowResult | null)[] = raws.map(() => null);
+  const batch: { index: number; lead: unknown }[] = [];
+  raws.forEach((raw, index) => {
+    const n = normalizeLead(raw);
+    if (n.ok) batch.push({ index, lead: n.lead });
+    else results[index] = n;
+  });
+
+  if (batch.length) {
+    const { data, error } = await createAdminClient().rpc("ingest_leads", { p: batch.map((b) => b.lead) });
+    if (error) console.error("ingest_leads failed:", error.message);
+    const rows = (data ?? []) as ({ customer_id: string; customer_created: boolean; duplicate: boolean } | { error: string })[];
+    batch.forEach((b, i) => {
+      const r = rows[i];
+      if (!r || "error" in r) {
+        if (r) console.error("ingest_leads row failed:", r.error);
+        results[b.index] = { ok: false, error: "Could not save this row." };
+      } else {
+        results[b.index] = { ok: true, customerId: r.customer_id, customerCreated: r.customer_created, duplicate: r.duplicate };
+      }
+    });
+  }
+  return results as BulkRowResult[];
+}

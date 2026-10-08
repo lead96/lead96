@@ -97,7 +97,7 @@ export function normalizeEmail(v: string | null | undefined): string | null {
  */
 export function hasAttribution(l: RawLead): boolean {
   if (l.source === "meta" || l.source === "google") return Boolean(l.campaign_id || l.ad_id || l.form_id);
-  return Boolean(l.utm_source || l.utm_campaign || l.gclid || l.fbclid || l.campaign_id);
+  return Boolean(l.utm_source || l.utm_campaign || l.gclid || l.fbclid || l.campaign_id || l.campaign_name);
 }
 
 export type NormalizeResult = { ok: true; lead: NormalizedLead } | { ok: false; error: string };

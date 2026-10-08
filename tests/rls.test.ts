@@ -211,6 +211,24 @@ describe.skipIf(!configured)("row-level security", () => {
     expect((await admin.from("usage_records").select("id").eq("id", seeded.data!.id)).data).toHaveLength(1);
   });
 
+  it("webhook deliveries: server-written only; visible to the owner, not staff or other businesses", async () => {
+    const seeded = await admin
+      .from("webhook_deliveries")
+      .insert({ provider: "call", external_id: `rls-${run}`, workspace_id: wsA, status: "processed", payload: { test: true } })
+      .select("id")
+      .single();
+    expect(seeded.error).toBeNull();
+
+    expect((await ownerA.client.from("webhook_deliveries").select("status").eq("id", seeded.data!.id)).data).toEqual([{ status: "processed" }]);
+    expect((await staffA.client.from("webhook_deliveries").select("id").eq("id", seeded.data!.id)).data).toEqual([]);
+    expect((await ownerB.client.from("webhook_deliveries").select("id").eq("id", seeded.data!.id)).data).toEqual([]);
+
+    const forged = await ownerA.client.from("webhook_deliveries").insert({ provider: "call", workspace_id: wsA, status: "processed" });
+    expect(forged.error).not.toBeNull();
+    await ownerA.client.from("webhook_deliveries").delete().eq("id", seeded.data!.id);
+    expect((await admin.from("webhook_deliveries").select("id").eq("id", seeded.data!.id)).data).toHaveLength(1);
+  });
+
   it("ZIP lookup: readable by any signed-in user, not writable, and finds real ZIPs", async () => {
     const miami = await ownerA.client.rpc("zip_city_matches", { p_city: "miami", p_state: "FL" });
     expect(miami.data).toHaveLength(1);

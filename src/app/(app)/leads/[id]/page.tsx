@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { Alert, Badge, Card, PageHeader } from "@/components/ui";
 import { requireWorkspace } from "@/lib/auth";
 import { formatDateTime, formatPhone } from "@/lib/format";
+import { CALL_FIELD_KEYS, formatDuration } from "@/lib/intake/call";
 import { SOURCE_LABELS, STATUS_LABELS, STATUS_TONES, type CustomerStatus, type LeadSource } from "@/lib/leads/normalize";
 import { loadSetupContext } from "@/lib/setup/service";
 import { createClient } from "@/lib/supabase/server";
@@ -37,6 +38,16 @@ type Lead = {
   received_at: string;
 };
 type Event = { id: number; type: string; subject_id: string | null; payload: Record<string, unknown>; actor_id: string | null; created_at: string };
+
+const CALL_STATUS_LABELS: Record<string, string> = {
+  completed: "Answered",
+  missed: "Missed",
+  voicemail: "Voicemail",
+  busy: "Busy",
+  failed: "Failed",
+};
+const ANSWERED_BY: Record<string, string> = { ai: "by AI agent", human: "by your team", voicemail: "by voicemail" };
+const callKeys = new Set<string>(CALL_FIELD_KEYS);
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -74,6 +85,9 @@ export default async function CustomerPage({ params }: PageProps<"/leads/[id]">)
   const pageName = (pid: string | null) => (pages ?? []).find((p) => p.id === pid)?.name ?? null;
   const serviceLabel = (v: string | null | undefined) => ctx.services.find((s) => s.value === v)?.label ?? v ?? null;
   const leadById = new Map(leads.map((l) => [l.id, l]));
+  // A lead is shown at the time it happened (call start, date in an imported file), not when it was stored.
+  const at = (e: Event) => (e.type === "lead.received" && e.subject_id && leadById.get(e.subject_id)?.received_at) || e.created_at;
+  const timeline = [...events].sort((a, b) => Date.parse(at(b)) - Date.parse(at(a)) || b.id - a.id);
   const latest = leads[0];
   const title = customer.full_name || formatPhone(customer.phone) || customer.email;
   const tz = workspace.timezone;
@@ -85,10 +99,18 @@ export default async function CustomerPage({ params }: PageProps<"/leads/[id]">)
         const l = e.subject_id ? leadById.get(e.subject_id) : undefined;
         const src = SOURCE_LABELS[(p.source as LeadSource) ?? "manual"] ?? p.source;
         const what = (l?.kind ?? p.kind) === "call" ? "Call" : "Lead";
-        const via = l?.landing_page_id ? pageName(l.landing_page_id) : null;
+        const via = l?.landing_page_id ? pageName(l.landing_page_id) : l?.source === "csv" ? l.form_name : null;
+        const f = (l?.fields ?? {}) as Record<string, string | number | undefined>;
+        const call =
+          l?.kind === "call"
+            ? [
+                [CALL_STATUS_LABELS[String(f.call_status)] ?? null, ANSWERED_BY[String(f.answered_by)] ?? null].filter(Boolean).join(" "),
+                Number(f.duration_seconds) > 0 ? formatDuration(Number(f.duration_seconds)) : null,
+              ]
+            : [];
         return {
           title: `${what} received — ${src}${via ? ` (${via})` : ""}`,
-          detail: [serviceLabel(l?.service ?? p.service), l?.campaign_name ?? p.campaign, l?.ad_name, l?.keyword ? `“${l.keyword}”` : null]
+          detail: [...call, serviceLabel(l?.service ?? p.service), l?.campaign_name ?? p.campaign, l?.ad_name, l?.keyword ? `“${l.keyword}”` : null]
             .filter(Boolean)
             .join(" · "),
         };
@@ -162,7 +184,7 @@ export default async function CustomerPage({ params }: PageProps<"/leads/[id]">)
                 {latest.adset_name ? <Row label={latest.source === "google" ? "Ad group" : "Ad set"}>{latest.adset_name}</Row> : null}
                 {latest.ad_name ? <Row label="Ad">{latest.ad_name}</Row> : null}
                 {latest.keyword || latest.utm_term ? <Row label="Keyword">{latest.keyword ?? latest.utm_term}</Row> : null}
-                {latest.form_name ? <Row label="Form">{latest.form_name}</Row> : null}
+                {latest.form_name ? <Row label={latest.source === "csv" ? "File" : "Form"}>{latest.form_name}</Row> : null}
                 {latest.utm_source ? <Row label="UTM">{[latest.utm_source, latest.utm_medium].filter(Boolean).join(" / ")}</Row> : null}
                 {latest.gclid ? <Row label="Google click">{<span className="break-all font-mono text-xs">{latest.gclid}</span>}</Row> : null}
                 {latest.fbclid ? <Row label="Meta click">{<span className="break-all font-mono text-xs">{latest.fbclid}</span>}</Row> : null}
@@ -175,20 +197,28 @@ export default async function CustomerPage({ params }: PageProps<"/leads/[id]">)
         <Card className="p-5">
           <h2 className="mb-4 font-semibold text-slate-900">Timeline</h2>
           <ol className="relative space-y-5 border-l border-slate-200 pl-5">
-            {events.map((e) => {
+            {timeline.map((e) => {
               const d = describe(e);
               const lead = e.type === "lead.received" && e.subject_id ? leadById.get(e.subject_id) : undefined;
-              const answers = lead ? Object.entries(lead.fields ?? {}).filter(([, v]) => v !== null && v !== "") : [];
+              const answers = lead ? Object.entries(lead.fields ?? {}).filter(([k, v]) => v !== null && v !== "" && !(lead.kind === "call" && callKeys.has(k))) : [];
+              const recording = lead?.kind === "call" ? lead.fields?.recording_url : undefined;
               return (
                 <li key={e.id} className="relative">
                   <span className="absolute -left-[25px] top-1.5 h-2.5 w-2.5 rounded-full border-2 border-white bg-brand-600" aria-hidden />
-                  <p className="text-xs text-slate-500">{formatDateTime(e.created_at, tz)}</p>
+                  <p className="text-xs text-slate-500">{formatDateTime(at(e), tz)}</p>
                   <p className="text-sm font-medium text-slate-900">{d.title}</p>
                   {d.detail ? <p className="text-sm text-slate-600">{d.detail}</p> : null}
                   {lead?.message ? <p className="mt-1 whitespace-pre-line rounded bg-slate-50 px-3 py-2 text-sm text-slate-700">{lead.message}</p> : null}
+                  {typeof recording === "string" && /^https:\/\//.test(recording) ? (
+                    <a href={recording} target="_blank" rel="noreferrer" className="text-xs text-brand-700 hover:underline">
+                      Call recording ↗
+                    </a>
+                  ) : null}
                   {answers.length ? (
                     <details className="mt-1 text-sm">
-                      <summary className="cursor-pointer text-xs text-brand-700">Form answers ({answers.length})</summary>
+                      <summary className="cursor-pointer text-xs text-brand-700">
+                        {lead?.kind === "call" ? "Caller answers" : lead?.source === "csv" ? "Other columns" : "Form answers"} ({answers.length})
+                      </summary>
                       <dl className="mt-1 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 rounded bg-slate-50 px-3 py-2 text-xs">
                         {answers.map(([k, v]) => (
                           <div key={k} className="contents">
