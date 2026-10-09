@@ -30,6 +30,7 @@ import {
   startConversation,
   type ChatMessage,
 } from "@/lib/setup/service";
+import { dbError } from "@/lib/supabase/errors";
 import { createClient } from "@/lib/supabase/server";
 
 export type ChatState = {
@@ -99,7 +100,7 @@ async function resolveArea(supabase: SupabaseClient, raw: AreaLookup): Promise<A
   }
 
   const { data, error } = await supabase.rpc("zips_within", { p_lat: center.lat, p_lng: center.lng, p_miles: miles, p_limit: MAX_AREA_ZIPS + 1 });
-  if (error) throw error;
+  if (error) throw dbError("Could not look up ZIP codes", error);
   const zips = ((data ?? []) as { zip: string }[]).map((r) => r.zip);
   return { kind: "ok", zips: zips.slice(0, MAX_AREA_ZIPS), label: center.label, miles, truncated: zips.length > MAX_AREA_ZIPS, guessedState };
 }
@@ -233,7 +234,7 @@ export async function sendSetupMessage(prev: ChatState, formData: FormData): Pro
       updated_at: now,
     })
     .eq("id", conversation.id);
-  if (error) throw error;
+  if (error) throw dbError("Could not save the chat", error);
 
   // Bookkeeping doesn't need to hold up the reply.
   after(async () => {

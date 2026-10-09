@@ -2,6 +2,7 @@ import "server-only";
 import { cache } from "react";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
+import { dbError, withRetry } from "@/lib/supabase/errors";
 import { createClient } from "@/lib/supabase/server";
 
 export const WORKSPACE_COOKIE = "lg_ws";
@@ -59,12 +60,11 @@ export const listWorkspaces = cache(async (): Promise<WorkspaceContext[]> => {
   const user = await getUser();
   if (!user) return [];
   const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("workspace_members")
-    .select("role, workspaces (id, name, vertical, timezone, setup_completed_at)")
-    .eq("user_id", user.id)
-    .order("created_at");
-  if (error) throw error;
+  // Every app page runs this; ride out a dropped connection instead of failing the page.
+  const { data, error } = await withRetry(() =>
+    supabase.from("workspace_members").select("role, workspaces (id, name, vertical, timezone, setup_completed_at)").eq("user_id", user.id).order("created_at"),
+  );
+  if (error) throw dbError("Could not load your businesses", error);
 
   return (data ?? []).flatMap((row) => {
     const ws = Array.isArray(row.workspaces) ? row.workspaces[0] : row.workspaces;

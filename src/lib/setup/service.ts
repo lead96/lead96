@@ -1,6 +1,7 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { recordAiUsage, structuredCompletion } from "@/lib/ai/openai";
+import { dbError } from "@/lib/supabase/errors";
 import { createAdminClient } from "@/lib/supabase/server";
 import type { WorkspaceContext } from "@/lib/auth";
 import {
@@ -66,7 +67,7 @@ async function loadTaxonomy(vertical: string) {
     .eq("vertical", vertical)
     .in("category", ["service", "customer_type"])
     .order("sort");
-  if (error) throw error;
+  if (error) throw dbError("Could not load the service list", error);
   const of = (category: string) =>
     (data ?? []).filter((t) => t.category === category).map((t) => ({ value: t.value as string, label: t.label as string }));
   const entry = { at: Date.now(), services: of("service"), customerTypes: of("customer_type").filter((c) => c.value !== "unknown") };
@@ -129,7 +130,7 @@ export async function startConversation(supabase: SupabaseClient, workspace: Wor
     })
     .select("id, messages, extracted, status, total_tokens, user_turns")
     .single();
-  if (error) throw error;
+  if (error) throw dbError("Could not start the setup chat", error);
   return data as Conversation;
 }
 
@@ -201,7 +202,7 @@ export async function generateCampaignPlan(
     })
     .select("id")
     .single();
-  if (error) throw error;
+  if (error) throw dbError("Could not save the campaign plan", error);
 
   await supabase.from("events").insert({
     workspace_id: workspace.id,

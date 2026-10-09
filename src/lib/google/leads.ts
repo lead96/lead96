@@ -171,6 +171,8 @@ export function googleAdsError(body: unknown, status: number): { code: string; m
 const FRIENDLY: Record<string, string> = {
   DEVELOPER_TOKEN_NOT_APPROVED:
     "The developer token only has Test access, so it can't read real accounts. Use a test manager account, or apply for Basic access in API Center.",
+  CLOUD_PROJECT_NOT_APPROVED_FOR_PRODUCTION:
+    "Google Ads API access is still at Test level, so only test accounts can be read. Use a test manager account for now, or apply for Explorer/Basic access in API Center.",
   DEVELOPER_TOKEN_PROHIBITED: "This developer token can't be used with this Google Cloud project.",
   USER_PERMISSION_DENIED: "The connected Google user has no access to this account through the manager account.",
   CUSTOMER_NOT_ENABLED: "This Google Ads account isn't active (cancelled or never finished setup).",
