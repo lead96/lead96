@@ -1,3 +1,4 @@
+import { ExternalLink } from "lucide-react";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { Alert, Badge, Card, PageHeader } from "@/components/ui";
@@ -108,8 +109,8 @@ export default async function CustomerPage({ params }: PageProps<"/leads/[id]">)
               ]
             : [];
         return {
-          title: `${what} received — ${src}${via ? ` (${via})` : ""}`,
-          detail: [...call, serviceLabel(l?.service ?? p.service), l?.campaign_name ?? p.campaign, l?.ad_name, l?.keyword ? `“${l.keyword}”` : null]
+          title: `${what} received - ${src}${via ? ` (${via})` : ""}`,
+          detail: [...call, serviceLabel(l?.service ?? p.service), l?.campaign_name ?? p.campaign, l?.ad_name, l?.keyword ? `'${l.keyword}'` : null]
             .filter(Boolean)
             .join(" · "),
         };
@@ -118,7 +119,7 @@ export default async function CustomerPage({ params }: PageProps<"/leads/[id]">)
         return { title: "Customer created" };
       case "customer.status_changed":
         return {
-          title: `Status: ${STATUS_LABELS[p.from as CustomerStatus] ?? p.from} → ${STATUS_LABELS[p.to as CustomerStatus] ?? p.to}`,
+          title: `Status changed from ${STATUS_LABELS[p.from as CustomerStatus] ?? p.from} to ${STATUS_LABELS[p.to as CustomerStatus] ?? p.to}`,
           detail: [p.reason, actorName(e.actor_id) ? `by ${actorName(e.actor_id)}` : null].filter(Boolean).join(" · "),
         };
       case "customer.notes_updated":
@@ -146,13 +147,13 @@ export default async function CustomerPage({ params }: PageProps<"/leads/[id]">)
               <Badge tone={STATUS_TONES[customer.status as CustomerStatus]}>{STATUS_LABELS[customer.status as CustomerStatus]}</Badge>
             </div>
             <dl className="space-y-2 text-sm">
-              <Row label="Phone">{customer.phone ? <a href={`tel:${customer.phone}`} className="text-brand-700 hover:underline">{formatPhone(customer.phone)}</a> : "—"}</Row>
-              <Row label="Email">{customer.email ? <a href={`mailto:${customer.email}`} className="break-all text-brand-700 hover:underline">{customer.email}</a> : "—"}</Row>
-              <Row label="ZIP">{customer.zip ?? "—"}</Row>
-              <Row label="Service">{serviceLabel(customer.service) ?? "—"}</Row>
-              <Row label="First source">{customer.first_source ? SOURCE_LABELS[customer.first_source as LeadSource] : "—"}</Row>
+              <Row label="Phone">{customer.phone ? <a href={`tel:${customer.phone}`} className="text-brand-700 hover:underline">{formatPhone(customer.phone)}</a> : "-"}</Row>
+              <Row label="Email">{customer.email ? <a href={`mailto:${customer.email}`} className="break-all text-brand-700 hover:underline">{customer.email}</a> : "-"}</Row>
+              <Row label="ZIP">{customer.zip ?? "-"}</Row>
+              <Row label="Service">{serviceLabel(customer.service) ?? "-"}</Row>
+              <Row label="First source">{customer.first_source ? SOURCE_LABELS[customer.first_source as LeadSource] : "-"}</Row>
               <Row label="Leads">{customer.lead_count}</Row>
-              <Row label="First contact">{customer.first_lead_at ? formatDateTime(customer.first_lead_at, tz) : "—"}</Row>
+              <Row label="First contact">{customer.first_lead_at ? formatDateTime(customer.first_lead_at, tz) : "-"}</Row>
             </dl>
             <div className="mt-5 border-t border-slate-100 pt-4">
               <StatusForm customerId={customer.id} status={customer.status as CustomerStatus} />
@@ -169,12 +170,12 @@ export default async function CustomerPage({ params }: PageProps<"/leads/[id]">)
               <h2 className="mb-3 font-semibold text-slate-900">Latest source</h2>
               {!latest.attribution_complete ? (
                 <div className="mb-3">
-                  <Alert tone="info">Source data incomplete — no campaign or click ID came with this lead.</Alert>
+                  <Alert tone="info">Source data incomplete - no campaign or click ID came with this lead.</Alert>
                 </div>
               ) : null}
               <dl className="space-y-2 text-sm">
                 <Row label="Source">{SOURCE_LABELS[latest.source]}</Row>
-                {latest.landing_page_id ? <Row label="Landing page">{pageName(latest.landing_page_id) ?? "—"}</Row> : null}
+                {latest.landing_page_id ? <Row label="Landing page">{pageName(latest.landing_page_id) ?? "-"}</Row> : null}
                 {latest.campaign_name || latest.utm_campaign ? <Row label="Campaign">{latest.campaign_name ?? latest.utm_campaign}</Row> : null}
                 {latest.adset_name ? <Row label={latest.source === "google" ? "Ad group" : "Ad set"}>{latest.adset_name}</Row> : null}
                 {latest.ad_name ? <Row label="Ad">{latest.ad_name}</Row> : null}
@@ -205,8 +206,9 @@ export default async function CustomerPage({ params }: PageProps<"/leads/[id]">)
                   {d.detail ? <p className="text-sm text-slate-600">{d.detail}</p> : null}
                   {lead?.message ? <p className="mt-1 whitespace-pre-line rounded bg-slate-50 px-3 py-2 text-sm text-slate-700">{lead.message}</p> : null}
                   {typeof recording === "string" && /^https:\/\//.test(recording) ? (
-                    <a href={recording} target="_blank" rel="noreferrer" className="text-xs text-brand-700 hover:underline">
-                      Call recording ↗
+                    <a href={recording} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-xs text-brand-700 hover:underline">
+                      Call recording
+                      <ExternalLink size={12} aria-hidden />
                     </a>
                   ) : null}
                   {answers.length ? (

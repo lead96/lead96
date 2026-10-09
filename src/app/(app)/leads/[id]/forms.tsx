@@ -22,10 +22,10 @@ export function StatusForm({ customerId, status }: { customerId: string; status:
           ))}
         </Select>
         <Button type="submit" variant="secondary" disabled={pending}>
-          {pending ? "…" : "Update"}
+          {pending ? "..." : "Update"}
         </Button>
       </div>
-      <Input name="reason" placeholder="Reason (optional), e.g. “left voicemail”" maxLength={300} aria-label="Reason" />
+      <Input name="reason" placeholder="Reason (optional), e.g. 'left voicemail'" maxLength={300} aria-label="Reason" />
       {state?.error ? <Alert tone="error">{state.error}</Alert> : null}
       {state?.message ? <Alert tone="success">{state.message}</Alert> : null}
     </form>
@@ -48,7 +48,7 @@ export function NotesForm({ customerId, notes }: { customerId: string; notes: st
       />
       <div className="flex items-center gap-3">
         <Button type="submit" variant="secondary" disabled={pending}>
-          {pending ? "Saving…" : "Save notes"}
+          {pending ? "Saving..." : "Save notes"}
         </Button>
         {state?.error ? <span className="text-sm text-red-600">{state.error}</span> : null}
         {state?.message ? <span className="text-sm text-emerald-700">{state.message}</span> : null}

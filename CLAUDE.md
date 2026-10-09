@@ -9,3 +9,4 @@
 - Auth: `getUser()` verifies the JWT locally with `getClaims()` (ES256 keys) — no Auth API round trip. Use `supabase.auth.getUser()` only where a fresh server check is required.
 - AI: structured outputs only, validate everything the model returns in code, log usage with `recordAiUsage`. Use `next/server` `after()` for non-blocking bookkeeping.
 - Product scope, plan and decisions live in the git-ignored `docs/` folder; keep it updated as work progresses.
+- Writing style (UI text, emails, comments, docs): plain hyphen "-" instead of em/en dashes, "..." instead of the ellipsis character, straight quotes, no emoji or text arrows/check marks (use lucide icons). No gradient text, glows or pulsing effects.

@@ -36,7 +36,7 @@ export async function createLandingPage(formData: FormData) {
     serviceArea,
   });
 
-  // Unique slug: business name, then business-name-2, -3… Slugs are unique across all
+  // Unique slug: business name, then business-name-2, -3... Slugs are unique across all
   // businesses (and other businesses' pages aren't visible), so let the database decide.
   const base = slugify(workspace.name);
   const label = TEMPLATES.find((t) => t.value === template)!.label;
@@ -62,7 +62,7 @@ export async function saveLandingPage(_: EditorState, formData: FormData): Promi
   const slug = String(formData.get("slug") ?? "").trim().toLowerCase();
   const template = TEMPLATES.find((t) => t.value === formData.get("template"))?.value as TemplateKey | undefined;
   if (!name) return { error: "Give the page a name." };
-  if (!SLUG_PATTERN.test(slug)) return { error: "The web address must be 3–60 lowercase letters, numbers or dashes." };
+  if (!SLUG_PATTERN.test(slug)) return { error: "The web address must be 3-60 lowercase letters, numbers or dashes." };
   if (!template) return { error: "Unknown template." };
 
   let raw: unknown;
@@ -106,7 +106,7 @@ export async function setPublished(_: EditorState, formData: FormData): Promise<
   revalidatePath(`/p/${data.slug}`);
   revalidatePath(`/landing-pages/${id}`);
   revalidatePath("/landing-pages");
-  return { message: publish ? "Published — the page is live." : "Unpublished — the page is offline." };
+  return { message: publish ? "Published - the page is live." : "Unpublished - the page is offline." };
 }
 
 export async function deleteLandingPage(formData: FormData) {

@@ -93,7 +93,7 @@ export type ImportChunkResult =
   | { ok: false; error: string };
 
 /**
- * Imports one chunk of mapped CSV rows (the browser parses the file and sends ≤ 200 rows per call).
+ * Imports one chunk of mapped CSV rows (the browser parses the file and sends <= 200 rows per call).
  * Owners only. Each row gets a stable id from its content, so importing the same file twice
  * doesn't add the same leads twice.
  */
@@ -140,7 +140,7 @@ export async function importLeads(input: z.input<typeof importSchema>): Promise<
   return out;
 }
 
-/** Stable id for a CSV row: same content → same id, so re-imports are recognized. */
+/** Stable id for a CSV row: same content -> same id, so re-imports are recognized. */
 function rowId(r: Record<string, string | undefined>, fields: Record<string, string> | undefined) {
   const canonical = JSON.stringify([
     Object.entries(r).filter(([, v]) => v).sort(([a], [b]) => a.localeCompare(b)),

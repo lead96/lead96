@@ -1,6 +1,6 @@
 /**
  * Normalizes an incoming lead from any source (landing page, Meta, Google, CSV, manual, call)
- * into the shape ingest_lead() expects. Pure — unit-tested.
+ * into the shape ingest_lead() expects. Pure - unit-tested.
  */
 import { normalizeUsPhone, parseZips } from "@/lib/setup/draft";
 
@@ -94,7 +94,7 @@ export function normalizeEmail(v: string | null | undefined): string | null {
 
 /**
  * Source data is "complete" when we can tell which campaign/ad produced the lead.
- * Leads without it are still stored, but flagged — attribution is never invented.
+ * Leads without it are still stored, but flagged - attribution is never invented.
  */
 export function hasAttribution(l: RawLead): boolean {
   if (l.source === "meta" || l.source === "google") return Boolean(l.campaign_id || l.ad_id || l.form_id);

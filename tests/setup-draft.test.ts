@@ -44,7 +44,7 @@ describe("validation helpers", () => {
     const h = normalizeHours(
       ["mon", "tue", "wed", "thu", "fri"].map((day) => ({ day, start: "08:00", end: "17:00" })).concat({ day: "sat", start: "09:00", end: "13:00" }),
     );
-    expect(describeHours(h)).toBe("Mon–Fri 08:00–17:00; Sat 09:00–13:00");
+    expect(describeHours(h)).toBe("Mon-Fri 08:00-17:00; Sat 09:00-13:00");
   });
 });
 

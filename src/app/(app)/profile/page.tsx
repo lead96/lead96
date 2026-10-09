@@ -36,7 +36,7 @@ export default async function ProfilePage({ searchParams }: PageProps<"/profile"
     <>
       <PageHeader
         title="Business profile"
-        description="The jobs you want, where and when — used by the AI caller, booking and your campaign plan."
+        description="The jobs you want, where and when - used by the AI caller, booking and your campaign plan."
         actions={
           isOwner ? (
             <Link href="/setup" className={buttonClass("secondary")}>
@@ -50,7 +50,7 @@ export default async function ProfilePage({ searchParams }: PageProps<"/profile"
         {savedParam === "setup" ? (
           <Alert tone={planParam === "failed" ? "info" : "success"}>
             {planParam === "failed"
-              ? "Your setup is saved. We couldn't create the campaign plan just now — use “Create plan” below to try again."
+              ? "Your setup is saved. We couldn't create the campaign plan just now - use 'Create plan' below to try again."
               : "Your setup is saved and your campaign plan is ready below. You can change anything here at any time."}
           </Alert>
         ) : null}
@@ -79,7 +79,7 @@ export default async function ProfilePage({ searchParams }: PageProps<"/profile"
             <div>
               <h2 className="font-semibold text-slate-900">Suggested campaign plan</h2>
               <p className="text-sm text-slate-500">
-                A recommendation only — nothing is launched. Campaign launching comes in a later phase.
+                A recommendation only - nothing is launched. Campaign launching comes in a later phase.
               </p>
             </div>
             {planRow ? (
@@ -105,7 +105,7 @@ export default async function ProfilePage({ searchParams }: PageProps<"/profile"
                       <tr key={c.channel}>
                         <td className="py-2 pr-4 font-medium text-slate-900">{c.label}</td>
                         <td className="py-2 pr-4">{c.share_percent}%</td>
-                        <td className="py-2 pr-4">{c.monthly_amount === null ? "—" : usd(c.monthly_amount)}</td>
+                        <td className="py-2 pr-4">{c.monthly_amount === null ? "-" : usd(c.monthly_amount)}</td>
                         <td className="py-2">{c.reason}</td>
                       </tr>
                     ))}
@@ -116,16 +116,16 @@ export default async function ProfilePage({ searchParams }: PageProps<"/profile"
                 <div>
                   <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">Budget</dt>
                   <dd className="mt-1">
-                    {plan.budget.monthly === null ? "—" : `${usd(plan.budget.monthly)} / month (about ${usd(plan.budget.daily ?? 0)} / day)`}
+                    {plan.budget.monthly === null ? "-" : `${usd(plan.budget.monthly)} / month (about ${usd(plan.budget.daily ?? 0)} / day)`}
                     {plan.budget_covers_appointments !== null
-                      ? ` — at your target cost, that budget covers up to ${plan.budget_covers_appointments} booked appointments a month.`
+                      ? ` - at your target cost, that budget covers up to ${plan.budget_covers_appointments} booked appointments a month.`
                       : null}
                   </dd>
                 </div>
                 <div>
                   <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">Landing page</dt>
                   <dd className="mt-1">
-                    <span className="font-medium text-slate-900">{plan.landing_page_label}</span> — {plan.template_reason}
+                    <span className="font-medium text-slate-900">{plan.landing_page_label}</span> - {plan.template_reason}
                   </dd>
                 </div>
                 <div className="sm:col-span-2">

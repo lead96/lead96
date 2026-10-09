@@ -50,7 +50,7 @@ export async function runLiveChecks(): Promise<LiveCheck[]> {
 
     timed("google_ads", "Google Ads API", async () => {
       const connection = await getConnection();
-      if (!connection) return skip("Not connected yet (Admin → Google Ads → Connect).");
+      if (!connection) return skip("Not connected yet (Admin > Google Ads > Connect).");
       try {
         const accounts = await listClientAccounts();
         return pass(`Signed in as ${connection.account_email ?? "unknown"}; ${accounts.length} ad account${accounts.length === 1 ? "" : "s"} under the manager account.`);
@@ -79,7 +79,7 @@ export async function runLiveChecks(): Promise<LiveCheck[]> {
     }),
 
     timed("intake", "Call intake", async () =>
-      env.INTAKE_SIGNING_SECRET ? pass("Signing secret set.") : skip("INTAKE_SIGNING_SECRET not set — endpoint answers 503."),
+      env.INTAKE_SIGNING_SECRET ? pass("Signing secret set.") : skip("INTAKE_SIGNING_SECRET not set - endpoint answers 503."),
     ),
   ]);
 }

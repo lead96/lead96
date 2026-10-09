@@ -64,7 +64,7 @@ describe.skipIf(!configured)("lead intake and CRM", () => {
   it("the same person across sources and formats becomes one customer", async () => {
     const first = await ingest({ kind: "form", source: "landing_page", full_name: "Ana Ruiz", phone: "(305) 555-0101", zip: "33101", utm_source: "google" });
     expect(first.customer_created).toBe(true);
-    // Same phone in another format, now with an email → same customer, email filled in.
+    // Same phone in another format, now with an email -> same customer, email filled in.
     const second = await ingest({ kind: "form", source: "meta", phone: "+1 305 555 0101", email: "Ana@Example.com", external_id: `m-${run}`, campaign_id: "c1" });
     expect(second.customer_id).toBe(first.customer_id);
     // Same email, no phone (a call-back from another number would match by phone instead).

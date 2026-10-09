@@ -22,7 +22,7 @@ export type CampaignPlan = {
   targeting_notes: string;
   first_steps: string[];
   budget: { monthly: number | null; daily: number | null };
-  /** budget ÷ target cost per appointment — simple arithmetic, not a forecast. */
+  /** budget / target cost per appointment - simple arithmetic, not a forecast. */
   budget_covers_appointments: number | null;
   service_area_zip_codes: string[];
 };

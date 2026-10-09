@@ -4,6 +4,7 @@
  * Renders a landing page from its template + content. Used by the public page (/p/[slug])
  * and by the editor's live preview (`preview` disables submitting).
  */
+import { Check, Phone } from "lucide-react";
 import { startTransition, useActionState, useEffect, useState, type CSSProperties, type FormEvent, type ReactNode } from "react";
 import { submitLandingForm } from "@/app/p/actions";
 import { consentText, textOn, type LandingContent, type TemplateKey } from "@/lib/landing/content";
@@ -23,7 +24,7 @@ export function LandingPage({ template, content, pageId, preview = false }: Prop
         href={preview ? undefined : telHref}
         className={`inline-flex items-center justify-center gap-2 rounded-lg bg-(--accent) font-semibold text-(--on-accent) shadow-sm hover:opacity-90 ${big ? "w-full px-6 py-4 text-lg sm:w-auto" : "px-4 py-2 text-sm"}`}
       >
-        <span aria-hidden>📞</span> {big && template === "call_first" ? `${c.cta_text} · ${c.phone}` : c.phone}
+        <Phone size={big ? 20 : 16} aria-hidden /> {big && template === "call_first" ? `${c.cta_text} · ${c.phone}` : c.phone}
       </a>
     ) : null;
 
@@ -126,9 +127,7 @@ function Trust({ c, align = "center" }: { c: LandingContent; align?: "center" | 
     <ul className={`mt-6 grid grid-cols-2 gap-2 text-sm text-slate-700 ${align === "center" ? "mx-auto max-w-md text-left" : "max-w-md"}`}>
       {points.map((p) => (
         <li key={p} className="flex items-center gap-2">
-          <span className="text-(--accent)" aria-hidden>
-            ✓
-          </span>
+          <Check size={16} className="shrink-0 text-(--accent)" aria-hidden />
           {p}
         </li>
       ))}
@@ -182,7 +181,7 @@ function LeadForm({ c, pageId, preview, fields, cta }: { c: LandingContent; page
       {fields.includes("service") && c.services.length ? (
         <Labeled label="What do you need?">
           <select name="service" defaultValue={v("service")} className={inputCls}>
-            <option value="">Choose…</option>
+            <option value="">Choose...</option>
             {c.services.map((s) => (
               <option key={s}>{s}</option>
             ))}
@@ -197,13 +196,13 @@ function LeadForm({ c, pageId, preview, fields, cta }: { c: LandingContent; page
       <Consent c={c} />
       {state?.error ? <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{state.error}</p> : null}
       <button type="submit" disabled={pending} className="w-full rounded-lg bg-(--accent) px-4 py-3 font-semibold text-(--on-accent) hover:opacity-90 disabled:opacity-60">
-        {preview ? `${cta} (preview)` : pending ? "Sending…" : cta}
+        {preview ? `${cta} (preview)` : pending ? "Sending..." : cta}
       </button>
     </form>
   );
 }
 
-const URGENCY = ["Emergency — today", "Within a few days", "This month", "Just planning"];
+const URGENCY = ["Emergency - today", "Within a few days", "This month", "Just planning"];
 
 function Quiz({ c, pageId, preview }: { c: LandingContent; pageId?: string; preview: boolean }) {
   const tracking = useTracking();
@@ -249,7 +248,7 @@ function Quiz({ c, pageId, preview }: { c: LandingContent; pageId?: string; prev
           </div>
           {step > 0 ? (
             <button type="button" onClick={() => setStep((s) => s - 1)} className="mt-3 text-sm text-slate-500 hover:underline">
-              ← Back
+              Back
             </button>
           ) : null}
         </div>
@@ -263,10 +262,10 @@ function Quiz({ c, pageId, preview }: { c: LandingContent; pageId?: string; prev
           <Consent c={c} />
           {state?.error ? <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{state.error}</p> : null}
           <button type="submit" disabled={pending} className="w-full rounded-lg bg-(--accent) px-4 py-3 font-semibold text-(--on-accent) hover:opacity-90 disabled:opacity-60">
-            {preview ? `${c.cta_text} (preview)` : pending ? "Sending…" : c.cta_text}
+            {preview ? `${c.cta_text} (preview)` : pending ? "Sending..." : c.cta_text}
           </button>
           <button type="button" onClick={() => setStep((s) => s - 1)} className="text-sm text-slate-500 hover:underline">
-            ← Back
+            Back
           </button>
         </div>
       )}
@@ -312,9 +311,9 @@ function Labeled({ label, children }: { label: string; children: ReactNode }) {
 function ThankYou({ c }: { c: LandingContent }) {
   return (
     <div className="py-6 text-center">
-      <p className="text-2xl" aria-hidden>
-        ✓
-      </p>
+      <span className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-(--accent) text-(--on-accent)" aria-hidden>
+        <Check size={24} />
+      </span>
       <p className="mt-2 text-lg font-semibold">Thank you! We got your request.</p>
       <p className="mt-1 text-sm text-slate-600">{c.business_name} will contact you shortly.</p>
       {c.phone ? <p className="mt-4 text-sm">Need help right now? Call <a href={`tel:${c.phone.replace(/[^\d+]/g, "")}`} className="font-semibold text-(--accent)">{c.phone}</a></p> : null}

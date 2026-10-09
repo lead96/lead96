@@ -1,5 +1,6 @@
 "use client";
 
+import { ExternalLink } from "lucide-react";
 import { startTransition, useActionState, useState, type ReactNode } from "react";
 import { LandingPage } from "@/components/landing/landing-page";
 import { Alert, Badge, Button, Card, Field, Input, Select } from "@/components/ui";
@@ -84,8 +85,9 @@ export function LandingEditor({
           <div className="flex items-center justify-between">
             <Badge tone={live ? "green" : "slate"}>{live ? "Live" : "Draft"}</Badge>
             {live ? (
-              <a href={publicUrl} target="_blank" rel="noreferrer" className="truncate pl-3 text-sm text-brand-700 hover:underline">
-                Open live page ↗
+              <a href={publicUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 truncate pl-3 text-sm text-brand-700 hover:underline">
+                Open live page
+                <ExternalLink size={14} aria-hidden />
               </a>
             ) : null}
           </div>
@@ -94,10 +96,10 @@ export function LandingEditor({
           {!readOnly ? (
             <div className="flex flex-wrap gap-2">
               <Button type="button" onClick={onSave} disabled={saving}>
-                {saving ? "Saving…" : dirty ? "Save changes" : "Save"}
+                {saving ? "Saving..." : dirty ? "Save changes" : "Save"}
               </Button>
               <Button type="button" variant="secondary" onClick={() => onPublish(!live)} disabled={publishing || dirty}>
-                {publishing ? "…" : live ? "Unpublish" : "Publish"}
+                {publishing ? "..." : live ? "Unpublish" : "Publish"}
               </Button>
             </div>
           ) : null}
@@ -141,7 +143,7 @@ export function LandingEditor({
                 ) : null}
                 <input id="logo" type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml" onChange={(e) => onLogo(e.target.files?.[0])} className="text-sm" />
               </div>
-              {upload.busy ? <p className="text-xs text-slate-500">Uploading…</p> : null}
+              {upload.busy ? <p className="text-xs text-slate-500">Uploading...</p> : null}
               {upload.error ? <p className="text-xs text-red-600">{upload.error}</p> : null}
               {content.logo_url ? (
                 <button type="button" onClick={() => set("logo_url", "")} className="text-xs text-slate-500 hover:underline">
@@ -155,7 +157,7 @@ export function LandingEditor({
                 <Input value={content.brand_color} onChange={(e) => set("brand_color", e.target.value)} maxLength={7} className="w-28 font-mono" aria-label="Brand color hex" />
               </div>
             </Field>
-            <Field label="Service area" htmlFor="service_area" hint="e.g. “Miami and 20 miles around”">
+            <Field label="Service area" htmlFor="service_area" hint="e.g. 'Miami and 20 miles around'">
               <Input id="service_area" value={content.service_area} onChange={(e) => set("service_area", e.target.value)} maxLength={100} />
             </Field>
           </Section>
@@ -189,7 +191,7 @@ export function LandingEditor({
               <Field label="Offer details" htmlFor="offer_details">
                 <Input id="offer_details" value={content.offer_details} onChange={(e) => set("offer_details", e.target.value)} maxLength={160} />
               </Field>
-              <Field label="Expires" htmlFor="offer_expires" hint="e.g. “Ends October 31”">
+              <Field label="Expires" htmlFor="offer_expires" hint="e.g. 'Ends October 31'">
                 <Input id="offer_expires" value={content.offer_expires} onChange={(e) => set("offer_expires", e.target.value)} maxLength={40} />
               </Field>
             </Section>

@@ -1,5 +1,6 @@
 "use client";
 
+import { CheckCircle2, Circle } from "lucide-react";
 import Link from "next/link";
 import { startTransition, useActionState, useEffect, useRef, useState } from "react";
 import { useFormStatus } from "react-dom";
@@ -111,7 +112,7 @@ export function SetupChat({
               <div className="flex justify-end">
                 <p className="max-w-[85%] whitespace-pre-line rounded-lg bg-brand-600/70 px-3.5 py-2.5 text-sm text-white">{sent}</p>
               </div>
-              <p className="text-sm text-slate-400">Assistant is typing…</p>
+              <p className="text-sm text-slate-400">Assistant is typing...</p>
             </>
           ) : null}
 
@@ -168,7 +169,7 @@ export function SetupChat({
               }}
               rows={2}
               maxLength={20000}
-              placeholder={done ? "Anything else to change? Or press Save setup." : chips.length ? "Pick an option above, or type your answer…" : "Type your answer…"}
+              placeholder={done ? "Anything else to change? Or press Save setup." : chips.length ? "Pick an option above, or type your answer..." : "Type your answer..."}
               aria-label="Your message"
               className="block min-h-[44px] w-full resize-none rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-600/20"
             />
@@ -206,8 +207,8 @@ export function SetupChat({
               const value = fieldValue(f.key, state.draft, options);
               return (
                 <li key={f.key} className="flex gap-2 text-sm">
-                  <span aria-hidden className={value ? "text-brand-600" : "text-slate-300"}>
-                    {value ? "✓" : "○"}
+                  <span aria-hidden className={value ? "mt-0.5 text-brand-600" : "mt-0.5 text-slate-300"}>
+                    {value ? <CheckCircle2 size={16} /> : <Circle size={16} />}
                   </span>
                   <span className="min-w-0">
                     <span className="block text-slate-500">{f.label}</span>
@@ -247,7 +248,7 @@ function SaveButton() {
   const { pending } = useFormStatus();
   return (
     <Button type="submit" className="w-full" disabled={pending}>
-      {pending ? "Saving and creating your plan…" : "Save setup"}
+      {pending ? "Saving and creating your plan..." : "Save setup"}
     </Button>
   );
 }

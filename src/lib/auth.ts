@@ -22,7 +22,7 @@ export type AuthUser = { id: string; email: string | undefined; user_metadata: R
 
 /**
  * The signed-in user, or null. The project signs tokens with ES256, so getClaims()
- * verifies the JWT signature locally (cached JWKS) instead of calling Supabase Auth —
+ * verifies the JWT signature locally (cached JWKS) instead of calling Supabase Auth -
  * one network round trip less on every page and action.
  */
 export const getUser = cache(async (): Promise<AuthUser | null> => {

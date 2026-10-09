@@ -27,7 +27,7 @@ export default async function OnboardingPage() {
       <div className="w-full max-w-md space-y-6">
         {invites && invites.length > 0 ? (
           <Card className="p-6">
-            <h2 className="font-semibold text-slate-900">You’ve been invited</h2>
+            <h2 className="font-semibold text-slate-900">You&apos;ve been invited</h2>
             <ul className="mt-3 space-y-3">
               {invites.map((inv) => (
                 <li key={inv.token} className="flex items-center justify-between gap-3">
@@ -42,7 +42,7 @@ export default async function OnboardingPage() {
                 </li>
               ))}
             </ul>
-            <p className="mt-4 text-xs text-slate-500">Joining a team? You don’t need to create your own business below.</p>
+            <p className="mt-4 text-xs text-slate-500">Joining a team? You don&apos;t need to create your own business below.</p>
           </Card>
         ) : null}
         <OnboardingForm />

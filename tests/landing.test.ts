@@ -4,7 +4,7 @@ import { hasAttribution, normalizeLead } from "@/lib/leads/normalize";
 
 describe("landing page content", () => {
   it("slugify makes valid, readable web addresses", () => {
-    expect(slugify("Cool Air HVAC — Miami!")).toBe("cool-air-hvac-miami");
+    expect(slugify("Cool Air HVAC - Miami!")).toBe("cool-air-hvac-miami");
     expect(slugify("Smith & Sons Heating")).toBe("smith-and-sons-heating");
     expect(slugify("Café Climat")).toBe("cafe-climat");
     expect(SLUG_PATTERN.test(slugify("A"))).toBe(true); // padded to a valid length

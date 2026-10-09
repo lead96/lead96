@@ -34,7 +34,7 @@ describe("area helpers", () => {
     expect(clampRadius(20.4)).toBe(20);
   });
   it("describes results and parses City, ST buttons", () => {
-    expect(describeAreaResult(["33101", "33102", "33109", "33110"], "Miami, FL", 15)).toMatch(/^Found 4 ZIP codes within 15 miles of Miami, FL — e\.g\. 33101, 33102, 33109 and 1 more\./);
+    expect(describeAreaResult(["33101", "33102", "33109", "33110"], "Miami, FL", 15)).toMatch(/^Found 4 ZIP codes within 15 miles of Miami, FL - e\.g\. 33101, 33102, 33109 and 1 more\./);
     expect(describeAreaResult(["33101"], "Miami, FL", 5)).toContain("Found 1 ZIP code within 5 miles");
     expect(parseCityLabel("Miami, FL")).toEqual({ city: "Miami", state: "FL" });
     expect(parseCityLabel("Miami")).toBeNull();
@@ -78,7 +78,7 @@ describe("resolveButtonAnswer (button clicks skip the model)", async () => {
     expect(resolveButtonAnswer("Both", ask("lead_types"), ctx, d)).toEqual({ kind: "updates", updates: { lead_types: ["form", "call"] } });
     expect(resolveButtonAnswer("10+", ask("capacity_per_day"), ctx, d)).toEqual({ kind: "updates", updates: { capacity_per_day: 10 } });
     expect(resolveButtonAnswer("$2,000", ask("monthly_budget"), ctx, d)).toEqual({ kind: "updates", updates: { monthly_budget: 2000 } });
-    const hours = resolveButtonAnswer("Mon–Sat 8am–6pm", ask("booking_hours"), ctx, d);
+    const hours = resolveButtonAnswer("Mon-Sat 8am-6pm", ask("booking_hours"), ctx, d);
     expect(hours?.kind === "updates" && hours.updates.booking_hours).toHaveLength(6);
     expect(resolveButtonAnswer("Looks good", ask("questions_confirmed"), ctx, d)).toMatchObject({ kind: "updates", updates: { questions_confirmed: true } });
   });

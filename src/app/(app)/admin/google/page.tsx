@@ -155,7 +155,7 @@ export default async function GoogleAdsAdminPage({ searchParams }: PageProps<"/a
                             <p className="text-xs text-slate-500">
                               {row.last_sync_at ? (
                                 <>
-                                  Last sync {timeAgo(row.last_sync_at, TZ)} —{" "}
+                                  Last sync {timeAgo(row.last_sync_at, TZ)} -{" "}
                                   {row.last_sync_status === "ok" && s
                                     ? `${s.leadsFound} leads found, ${s.leadsNew} new; ${s.spendRows} spend rows (${s.spendTotal.toLocaleString("en-US")})`
                                     : (row.last_sync_error ?? "failed")}
@@ -169,7 +169,7 @@ export default async function GoogleAdsAdminPage({ searchParams }: PageProps<"/a
                           <details className="space-y-2">
                             <summary className="cursor-pointer text-sm font-medium text-slate-900">Lead form webhook (real-time leads)</summary>
                             <p className="mt-2 text-xs text-slate-500">
-                              In Google Ads → the lead form → Lead delivery → Webhook integration, paste this URL and key, then click “Send test data”. The test
+                              In Google Ads, open the lead form, then Lead delivery, then Webhook integration. Paste this URL and key, then click &quot;Send test data&quot;. The test
                               shows up below in Admin as a test delivery.
                             </p>
                             <div className="mt-2 space-y-2">

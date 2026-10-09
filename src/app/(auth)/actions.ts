@@ -48,7 +48,7 @@ export async function signup(_: FormState, formData: FormData): Promise<FormStat
   });
   if (error) return { error: error.message, fields };
 
-  // Email confirmation disabled in the project → user is signed in already.
+  // Email confirmation disabled in the project -> user is signed in already.
   if (data.session) redirect(next);
   return { message: "Check your email to confirm your account, then sign in." };
 }

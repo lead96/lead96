@@ -72,8 +72,8 @@ export default async function DashboardPage() {
         <StatCard icon={UserCheck} title="Qualified" subtitle="A good fit for your services" value={count(QUALIFIED)} footer={footer} />
         <StatCard icon={CalendarCheck} title="Booked" subtitle="Appointment set" value={count(BOOKED)} footer={footer} />
         <StatCard icon={Trophy} title="Won" subtitle="Became a paying job" value={count(["won"])} footer={footer} tone="green" />
-        <StatCard icon={DollarSign} title="Revenue" subtitle="From won jobs" value="—" footer="Coming soon" tone="slate" muted />
-        <StatCard icon={Calculator} title="Cost per booking" subtitle="Ad spend ÷ appointments" value="—" footer="Coming soon" tone="slate" muted />
+        <StatCard icon={DollarSign} title="Revenue" subtitle="From won jobs" value="-" footer="Coming soon" tone="slate" muted />
+        <StatCard icon={Calculator} title="Cost per booking" subtitle="Ad spend / appointments" value="-" footer="Coming soon" tone="slate" muted />
       </div>
       </Section>
 

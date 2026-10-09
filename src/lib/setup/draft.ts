@@ -89,7 +89,7 @@ export function parseZips(input: string | string[]): string[] {
   return [...new Set(found.map((z) => z.slice(0, 5)))];
 }
 
-/** US phone → E.164 (+1XXXXXXXXXX), or null if it isn't a valid 10-digit US number. */
+/** US phone -> E.164 (+1XXXXXXXXXX), or null if it isn't a valid 10-digit US number. */
 export function normalizeUsPhone(input: string): string | null {
   const digits = input.replace(/\D/g, "");
   const national = digits.length === 11 && digits.startsWith("1") ? digits.slice(1) : digits;
@@ -97,7 +97,7 @@ export function normalizeUsPhone(input: string): string | null {
   return `+1${national}`;
 }
 
-/** +12145550199 → (214) 555-0199 for display. Anything else is shown unchanged. */
+/** +12145550199 -> (214) 555-0199 for display. Anything else is shown unchanged. */
 export function formatUsPhone(e164: string | null): string {
   const m = e164?.match(/^\+1(\d{3})(\d{3})(\d{4})$/);
   return m ? `(${m[1]}) ${m[2]}-${m[3]}` : (e164 ?? "");
@@ -303,13 +303,13 @@ export function draftFromSaved(
   return d;
 }
 
-/** "Mon–Fri 08:00–17:00, Sat 09:00–13:00" */
+/** "Mon-Fri 08:00-17:00, Sat 09:00-13:00" */
 export function describeHours(h: BookingHours): string {
   const parts: { days: Weekday[]; ranges: string }[] = [];
   for (const day of WEEKDAYS) {
     const ranges = h[day];
     if (!ranges?.length) continue;
-    const text = ranges.map((r) => `${r.start}–${r.end}`).join(", ");
+    const text = ranges.map((r) => `${r.start}-${r.end}`).join(", ");
     const last = parts.at(-1);
     const prevDay = last ? WEEKDAYS[WEEKDAYS.indexOf(last.days.at(-1)!) + 1] : null;
     if (last && last.ranges === text && prevDay === day) last.days.push(day);
@@ -317,7 +317,7 @@ export function describeHours(h: BookingHours): string {
   }
   return parts
     .map((p) => {
-      const days = p.days.length > 2 ? `${WEEKDAY_LABELS[p.days[0]]}–${WEEKDAY_LABELS[p.days.at(-1)!]}` : p.days.map((d) => WEEKDAY_LABELS[d]).join(", ");
+      const days = p.days.length > 2 ? `${WEEKDAY_LABELS[p.days[0]]}-${WEEKDAY_LABELS[p.days.at(-1)!]}` : p.days.map((d) => WEEKDAY_LABELS[d]).join(", ");
       return `${days} ${p.ranges}`;
     })
     .join("; ");

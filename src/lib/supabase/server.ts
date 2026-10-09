@@ -27,7 +27,7 @@ export async function createClient() {
 }
 
 /**
- * Service-role client. Bypasses RLS — use only in trusted server code
+ * Service-role client. Bypasses RLS - use only in trusted server code
  * (webhooks, jobs, admin) and always scope queries by workspace_id explicitly.
  */
 export function createAdminClient() {

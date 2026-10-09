@@ -193,7 +193,7 @@ export default async function LeadsPage({ searchParams }: PageProps<"/leads">) {
                           </Link>
                           <div className="text-xs text-slate-500">{[formatPhone(r.phone), r.email].filter(Boolean).join(" · ")}</div>
                         </td>
-                        <td className="px-4 py-3 text-slate-700">{[serviceLabel(r.service), r.zip].filter(Boolean).join(" · ") || "—"}</td>
+                        <td className="px-4 py-3 text-slate-700">{[serviceLabel(r.service), r.zip].filter(Boolean).join(" · ") || "-"}</td>
                         <td className="px-4 py-3">
                           {l ? (
                             <>
@@ -201,14 +201,14 @@ export default async function LeadsPage({ searchParams }: PageProps<"/leads">) {
                               {campaign ? <div className="mt-0.5 max-w-[220px] truncate text-xs text-slate-500">{campaign}</div> : null}
                             </>
                           ) : (
-                            "—"
+                            "-"
                           )}
                         </td>
                         <td className="px-4 py-3">
                           <Badge tone={STATUS_TONES[r.status]}>{STATUS_LABELS[r.status]}</Badge>
                         </td>
                         <td className="px-4 py-3 text-right tabular-nums text-slate-700">{r.lead_count}</td>
-                        <td className="px-4 py-3 text-right text-slate-500">{r.last_lead_at ? timeAgo(r.last_lead_at, workspace.timezone) : "—"}</td>
+                        <td className="px-4 py-3 text-right text-slate-500">{r.last_lead_at ? timeAgo(r.last_lead_at, workspace.timezone) : "-"}</td>
                       </tr>
                     );
                   })}

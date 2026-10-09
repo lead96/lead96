@@ -59,11 +59,11 @@ type ModelTurn = { reply: string; understood: boolean; updates: DraftUpdates; ar
 function rejectionReply(rejected: string[]) {
   const notes = new Set<string>();
   for (const r of rejected) {
-    if (r.startsWith("zip_codes")) notes.add("I couldn't find a valid 5-digit ZIP code there. You can also just tell me a city and how far you travel, like “Miami, 20 miles”.");
-    else if (r.startsWith("booking_hours")) notes.add("I couldn't read those hours — could you write them like “Mon–Fri 8am–5pm”?");
-    else if (r.startsWith("transfer_phone")) notes.add("That phone number doesn't look like a valid US number — could you send it again with the area code, like (214) 555-0100?");
+    if (r.startsWith("zip_codes")) notes.add("I couldn't find a valid 5-digit ZIP code there. You can also just tell me a city and how far you travel, like 'Miami, 20 miles'.");
+    else if (r.startsWith("booking_hours")) notes.add("I couldn't read those hours - could you write them like 'Mon-Fri 8am-5pm'?");
+    else if (r.startsWith("transfer_phone")) notes.add("That phone number doesn't look like a valid US number - could you send it again with the area code, like (214) 555-0100?");
     else if (/^(capacity_per_day|appointment_minutes|monthly_budget|target_cost_per_appointment)/.test(r))
-      notes.add("One of those numbers looks out of range, so I didn't save it — could you check it?");
+      notes.add("One of those numbers looks out of range, so I didn't save it - could you check it?");
   }
   return [...notes].join(" ");
 }
@@ -149,11 +149,11 @@ export async function sendSetupMessage(prev: ChatState, formData: FormData): Pro
       draft = { ...draft, zip_codes: area.zips, area_description: `${area.label} · ${area.miles} mi` };
       note = describeAreaResult(area.zips, area.label, area.miles);
       if (area.truncated) note += ` That's a big area, so I kept the nearest ${MAX_AREA_ZIPS}. Tell me a smaller radius if you like.`;
-      if (area.guessedState) note += ` (If you meant a different state, just tell me, e.g. “${normalizeAreaLookup(lookup).city}, TX”.)`;
+      if (area.guessedState) note += ` (If you meant a different state, just tell me, e.g. '${normalizeAreaLookup(lookup).city}, TX'.)`;
     } else if (area?.kind === "ambiguous") {
       followUp = { text: `Which ${area.city} do you mean?`, options: area.choices, radius_miles: area.miles };
     } else if (area?.kind === "none") {
-      followUp = { text: `I couldn't find a place called “${area.place}”. Could you check the spelling, add the state, or paste your ZIP codes?` };
+      followUp = { text: `I couldn't find a place called '${area.place}'. Could you check the spelling, add the state, or paste your ZIP codes?` };
     }
   };
 
@@ -162,7 +162,7 @@ export async function sendSetupMessage(prev: ChatState, formData: FormData): Pro
   if (zipList) {
     ({ draft, rejected } = mergeUpdates(draft, { zip_codes: zipList }, vocab));
     draft.area_description = null;
-    ack = `Got it — ${zipList.length} ZIP code${zipList.length === 1 ? "" : "s"}.`;
+    ack = `Got it - ${zipList.length} ZIP code${zipList.length === 1 ? "" : "s"}.`;
   } else if (button?.kind === "updates") {
     ({ draft, rejected } = mergeUpdates(draft, button.updates, vocab));
   } else if (button?.kind === "ask") {
@@ -172,7 +172,7 @@ export async function sendSetupMessage(prev: ChatState, formData: FormData): Pro
   } else {
     const history = conversation.messages
       .slice(-HISTORY_MESSAGES)
-      .map(({ role, content }) => ({ role, content: content.length > HISTORY_CHARS ? `${content.slice(0, HISTORY_CHARS)}…` : content }));
+      .map(({ role, content }) => ({ role, content: content.length > HISTORY_CHARS ? `${content.slice(0, HISTORY_CHARS)}...` : content }));
     try {
       const result = await structuredCompletion<ModelTurn>({
         name: "setup_turn",

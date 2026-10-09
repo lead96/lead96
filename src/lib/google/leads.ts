@@ -1,9 +1,9 @@
 /**
- * Google Ads lead forms → our lead shape. Two ways in, one mapping:
+ * Google Ads lead forms -> our lead shape. Two ways in, one mapping:
  *  - the lead-form webhook (real time, set per form in Google Ads)
  *  - the API (lead_form_submission_data), used to catch up on anything the webhook missed.
  * When Google gives a click ID, both use it as the lead's id, so the same lead from both ways is stored once.
- * Pure — unit-tested.
+ * Pure - unit-tested.
  */
 import { z } from "zod";
 import type { RawLead } from "@/lib/leads/normalize";
@@ -107,7 +107,7 @@ export type ApiLeadRow = {
   };
 };
 
-/** Last path segment of a resource name; for adGroupAds ("…/adGroupAds/111~222") the ad ID. */
+/** Last path segment of a resource name; for adGroupAds (".../adGroupAds/111~222") the ad ID. */
 export const resourceId = (name?: string) => {
   const last = name?.split("/").pop();
   return last ? (last.split("~").pop() ?? null) : null;
@@ -148,7 +148,7 @@ export function apiRowToLead(
   };
 }
 
-/** "2019-01-01 12:32:45-08:00" (API) or ISO-8601 (webhook) → ISO UTC; null if unreadable. */
+/** "2019-01-01 12:32:45-08:00" (API) or ISO-8601 (webhook) -> ISO UTC; null if unreadable. */
 export function parseGoogleTime(value: string | undefined | null): string | null {
   if (!value) return null;
   const t = Date.parse(value.trim().replace(/^(\d{4}-\d{2}-\d{2}) /, "$1T"));

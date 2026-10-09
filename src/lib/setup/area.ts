@@ -1,5 +1,5 @@
 /**
- * Service-area helpers for the setup chat. Pure functions — unit-tested.
+ * Service-area helpers for the setup chat. Pure functions - unit-tested.
  * ZIP data comes from public.us_zip_codes (GeoNames); the AI never invents ZIP codes.
  */
 import { parseZips } from "./draft";
@@ -23,7 +23,7 @@ const US_STATES = new Set(
 );
 
 /**
- * Clean up what the model extracted: "Miami, FL" / "Miami FL" in the city field → city + state,
+ * Clean up what the model extracted: "Miami, FL" / "Miami FL" in the city field -> city + state,
  * filler words ("around", "near", "city of") removed, state upper-cased and validated.
  */
 export function normalizeAreaLookup(l: AreaLookup): AreaLookup {
@@ -56,7 +56,7 @@ export function messageMentionsPlace(text: string, l: AreaLookup): boolean {
 export const DOMINANT_CITY_RATIO = 5;
 
 /**
- * Pick the obvious city for a name ("Miami" → Miami, FL), or null when several are
+ * Pick the obvious city for a name ("Miami" -> Miami, FL), or null when several are
  * plausible ("Springfield", "Columbus", "Kansas City") and the owner should choose.
  */
 export function pickDominantCity<T extends { zip_count: number }>(rows: T[]): T | null {
@@ -85,11 +85,11 @@ export function extractZipList(text: string): string[] | null {
   return leftover.length <= 20 ? zips : null;
 }
 
-/** "Found 95 ZIP codes within 15 miles of Miami, FL — e.g. 33101, 33125, 33130 and 92 more." */
+/** "Found 95 ZIP codes within 15 miles of Miami, FL - e.g. 33101, 33125, 33130 and 92 more." */
 export function describeAreaResult(zips: string[], label: string, miles: number) {
   const sample = zips.slice(0, 3).join(", ");
   const rest = zips.length - 3;
-  return `Found ${zips.length} ZIP code${zips.length === 1 ? "" : "s"} within ${miles} miles of ${label} — ${
+  return `Found ${zips.length} ZIP code${zips.length === 1 ? "" : "s"} within ${miles} miles of ${label} - ${
     rest > 0 ? `e.g. ${sample} and ${rest} more` : sample
   }. I've added them; you can remove any later in Business profile.`;
 }

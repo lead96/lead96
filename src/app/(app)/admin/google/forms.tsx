@@ -24,7 +24,7 @@ export function AssignForm({ account, businesses, current }: { account: Account;
         ))}
       </Select>
       <Button type="submit" variant="secondary" size="sm" disabled={pending}>
-        {pending ? "Saving…" : "Save"}
+        {pending ? "Saving..." : "Save"}
       </Button>
       {state?.error ? <span className="text-xs text-red-600">{state.error}</span> : null}
       {state?.message ? <span className="text-xs text-emerald-700">{state.message}</span> : null}
@@ -39,7 +39,7 @@ export function SyncButton({ accountId }: { accountId: string }) {
     <form action={action} className="space-y-1">
       <input type="hidden" name="account_id" value={accountId} />
       <Button type="submit" variant="secondary" size="sm" disabled={pending}>
-        {pending ? "Syncing…" : "Sync now"}
+        {pending ? "Syncing..." : "Sync now"}
       </Button>
       {state?.error ? <p className="max-w-sm text-xs text-red-600">{state.error}</p> : null}
       {s ? (

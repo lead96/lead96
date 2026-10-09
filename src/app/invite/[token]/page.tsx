@@ -66,7 +66,7 @@ export default async function InvitePage({ params, searchParams }: PageProps<"/i
   // Only for the invited person. The owner opening their own link must not see "you're on the team".
   if (isInvitee && invite.already_member) {
     return (
-      <Shell title="You’re on the team">
+      <Shell title="You're on the team">
         <p>You are already a member of {team}.</p>
         {goToTeam}
       </Shell>
@@ -94,7 +94,7 @@ export default async function InvitePage({ params, searchParams }: PageProps<"/i
 
   const intro = (
     <p>
-      You’ve been invited to join {team} as <span className="capitalize">{invite.role}</span>.
+      You&apos;ve been invited to join {team} as <span className="capitalize">{invite.role}</span>.
     </p>
   );
   const errorAlert =
@@ -128,7 +128,7 @@ export default async function InvitePage({ params, searchParams }: PageProps<"/i
           This is an invite to join {team} as <span className="capitalize">{invite.role}</span>.
         </p>
         <p>
-          This invite is for {invitedEmail}, but you’re signed in as{" "}
+          This invite is for {invitedEmail}, but you&apos;re signed in as{" "}
           <span className="font-medium text-slate-900">{user.email}</span>.
         </p>
         <form action={switchAccountForInvite}>
@@ -140,7 +140,7 @@ export default async function InvitePage({ params, searchParams }: PageProps<"/i
         </form>
         <p className="text-xs text-slate-500">
           {invite.already_member
-            ? `You're already in this team. This link is for ${invite.email} — send it to them, or open it in a private window to test it.`
+            ? `You're already in this team. This link is for ${invite.email} - send it to them, or open it in a private window to test it.`
             : `Sharing this link? Send it to ${invite.email}, or open it in a private window.`}
         </p>
       </Shell>

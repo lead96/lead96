@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, ChevronRight } from "lucide-react";
 import type { ComponentProps, ComponentType, ReactNode, SVGProps } from "react";
 
 export function cx(...classes: (string | false | null | undefined)[]) {
@@ -257,9 +257,7 @@ export function ActionCard({ href, icon, title, description, tone = "blue" }: { 
         <span className="block text-sm font-semibold text-slate-900">{title}</span>
         <span className="mt-0.5 block text-xs text-slate-500">{description}</span>
       </span>
-      <span aria-hidden className="mt-2 text-slate-400 transition-transform group-hover:translate-x-0.5">
-        →
-      </span>
+      <ChevronRight size={18} aria-hidden className="mt-2.5 shrink-0 text-slate-400 transition-transform group-hover:translate-x-0.5" />
     </Link>
   );
 }

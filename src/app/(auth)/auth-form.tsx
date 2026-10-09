@@ -34,7 +34,7 @@ export function AuthForm({
           {state?.error ? <Alert tone="error">{state.error}</Alert> : null}
           {children}
           <Button type="submit" className="w-full" disabled={pending}>
-            {pending ? "Please wait…" : submitLabel}
+            {pending ? "Please wait..." : submitLabel}
           </Button>
         </form>
       )}

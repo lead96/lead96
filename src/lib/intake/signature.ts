@@ -32,7 +32,7 @@ export function verify(opts: {
   const nowSec = Math.floor((opts.now ?? Date.now()) / 1000);
   if (!/^\d{9,11}$/.test(timestamp) || Math.abs(nowSec - ts) > TOLERANCE_SECONDS) return { ok: false, reason: "stale_timestamp" };
   const expected = Buffer.from(sign(secret, timestamp, body));
-  // A header may carry several signatures during secret rotation: "v1=…,v1=…".
+  // A header may carry several signatures during secret rotation: "v1=...,v1=...".
   const match = signature.split(",").some((s) => {
     const given = Buffer.from(s.trim());
     return given.length === expected.length && timingSafeEqual(given, expected);

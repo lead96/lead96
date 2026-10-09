@@ -82,7 +82,7 @@ export function DemandProfileForm({
         />
         <CheckboxGroup name="customer_types" legend="Customers" options={options.customerTypes} selected={values.customer_types} />
 
-        <Field label="Service area — ZIP codes" htmlFor="zip_codes" hint="Separate with commas, spaces or new lines.">
+        <Field label="Service area - ZIP codes" htmlFor="zip_codes" hint="Separate with commas, spaces or new lines.">
           <textarea
             id="zip_codes"
             name="zip_codes"
@@ -140,7 +140,7 @@ export function DemandProfileForm({
       </fieldset>
       {!readOnly ? (
         <Button type="submit" disabled={pending}>
-          {pending ? "Saving…" : "Save"}
+          {pending ? "Saving..." : "Save"}
         </Button>
       ) : null}
     </form>
@@ -172,7 +172,7 @@ export function AgentSettingsForm({
             <Input id="transfer_phone" name="transfer_phone" type="tel" defaultValue={formatUsPhone(transferPhone)} />
           </Field>
           <Field label="Greeting" htmlFor="greeting" hint="Optional. How the AI opens a call.">
-            <Input id="greeting" name="greeting" maxLength={300} defaultValue={greeting ?? ""} placeholder="Hi, this is the scheduling assistant for …" />
+            <Input id="greeting" name="greeting" maxLength={300} defaultValue={greeting ?? ""} placeholder="Hi, this is the scheduling assistant for ..." />
           </Field>
         </div>
 
@@ -233,7 +233,7 @@ export function AgentSettingsForm({
       </fieldset>
       {!readOnly ? (
         <Button type="submit" disabled={pending}>
-          {pending ? "Saving…" : "Save"}
+          {pending ? "Saving..." : "Save"}
         </Button>
       ) : null}
     </form>
@@ -247,7 +247,7 @@ export function RegeneratePlanButton({ children }: { children: ReactNode }) {
       <Status state={state} />
       <form action={dispatch}>
         <Button type="submit" variant="secondary" disabled={pending}>
-          {pending ? "Creating plan…" : children}
+          {pending ? "Creating plan..." : children}
         </Button>
       </form>
     </div>

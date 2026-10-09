@@ -299,7 +299,7 @@ describe.skipIf(!configured)("row-level security", () => {
     expect(Number(miami.data![0].zip_count)).toBeGreaterThan(50);
 
     const springfield = await ownerA.client.rpc("zip_city_matches", { p_city: "Springfield", p_state: null });
-    expect(springfield.data!.length).toBeGreaterThan(5); // ambiguous → app asks which state
+    expect(springfield.data!.length).toBeGreaterThan(5); // ambiguous -> app asks which state
 
     const near = await ownerA.client.rpc("zips_within", { p_lat: miami.data![0].lat, p_lng: miami.data![0].lng, p_miles: 5, p_limit: 400 });
     expect(near.data!.length).toBeGreaterThan(5);

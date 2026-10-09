@@ -17,13 +17,13 @@ npm run db:push                 # apply supabase/migrations
 npm run dev                     # http://localhost:3000
 ```
 
-In the Supabase dashboard → Authentication → URL Configuration, set **Site URL** to the app URL and add `<app-url>/auth/confirm` to **Redirect URLs**.
+In the Supabase dashboard -> Authentication -> URL Configuration, set **Site URL** to the app URL and add `<app-url>/auth/confirm` to **Redirect URLs**.
 
 ### Auth email templates
 
 Auth emails must link to our `/auth/confirm` page with a `token_hash` (not Supabase's default `{{ .ConfirmationURL }}`). That way links work in any browser or device, and mail scanners opening the link don't use up the one-time token: it is only used when the user presses **Continue**.
 
-Supabase only allows custom templates once **custom SMTP** is configured (free tier + built-in sender = default templates only). After setting up SMTP (Resend), for each hosted project: Supabase → Authentication → Emails, paste the HTML from `supabase/templates/` into the matching template (or set them via the Management API `PATCH /v1/projects/{ref}/config/auth`):
+Supabase only allows custom templates once **custom SMTP** is configured (free tier + built-in sender = default templates only). After setting up SMTP (Resend), for each hosted project: Supabase -> Authentication -> Emails, paste the HTML from `supabase/templates/` into the matching template (or set them via the Management API `PATCH /v1/projects/{ref}/config/auth`):
 
 | Template | File |
 |---|---|
@@ -34,45 +34,45 @@ Supabase only allows custom templates once **custom SMTP** is configured (free t
 
 `{{ .SiteURL }}` in the templates is the project's Site URL, so it must be the app URL for that environment. `supabase/config.toml` points to the same files for local Supabase.
 
-Supabase's built-in email sender only delivers to the project's team members and a few emails per hour. Before real users sign up, configure custom SMTP (Resend) under Authentication → SMTP.
+Supabase's built-in email sender only delivers to the project's team members and a few emails per hour. Before real users sign up, configure custom SMTP (Resend) under Authentication -> SMTP.
 
 ### Brand
 
-Lead96 palette (brand sheet in `public/Logo`): Electric Blue `#3B82F6` (actions, links), Purple `#8B5CF6` (gradient accent only), Mint `#10B981` (success), Dark `#0B0F19` (sidebar). Tokens live in `src/app/globals.css` (`brand-*`, `accent-600`, `ink`). Use `<Logo on="light|dark" />` from `src/components/logo.tsx`; trimmed renders are in `public/brand/`, originals in `public/Logo/`. App icons are Next file conventions: `src/app/favicon.ico`, `icon.png`, `apple-icon.png` (regenerate from `public/Logo/` if the logo changes). Light SaaS look: white sidebar and cards on a pale gray page (`--color-page`), soft shadows (`shadow-card`, `shadow-menu`), line icons from `lucide-react`. Shared building blocks are in `src/components/ui.tsx` (`StatCard`, `EmptyState`, `ActionCard`, `IconTile`, `PageHeader` — header buttons go full-width on phones). The app shell is `src/app/(app)/layout.tsx` with `sidebar-nav.tsx` (also used by the phone drawer `mobile-nav.tsx`), `profile-menu.tsx` and `top-search.tsx`. Plain CRM look — no gradients or glow on UI elements.
+Lead96 palette (brand sheet in `public/Logo`): Electric Blue `#3B82F6` (actions, links), Purple `#8B5CF6` (gradient accent only), Mint `#10B981` (success), Dark `#0B0F19` (sidebar). Tokens live in `src/app/globals.css` (`brand-*`, `accent-600`, `ink`). Use `<Logo on="light|dark" />` from `src/components/logo.tsx`; trimmed renders are in `public/brand/`, originals in `public/Logo/`. App icons are Next file conventions: `src/app/favicon.ico`, `icon.png`, `apple-icon.png` (regenerate from `public/Logo/` if the logo changes). Light SaaS look: white sidebar and cards on a pale gray page (`--color-page`), soft shadows (`shadow-card`, `shadow-menu`), line icons from `lucide-react`. Shared building blocks are in `src/components/ui.tsx` (`StatCard`, `EmptyState`, `ActionCard`, `IconTile`, `PageHeader` - header buttons go full-width on phones). The app shell is `src/app/(app)/layout.tsx` with `sidebar-nav.tsx` (also used by the phone drawer `mobile-nav.tsx`), `profile-menu.tsx` and `top-search.tsx`. Plain CRM look - no gradients or glow on UI elements.
 
 ### Setup assistant and Business profile
 
-`/setup` is the setup chat (owners). The app asks the questions and shows answer buttons (`src/lib/setup/questions.ts`); button clicks are mapped in code (no model call, ~1 s); only typed answers go to the model (`OPENAI_CHAT_MODEL`, default `gpt-4.1-nano`, with a compact prompt). The campaign plan uses `OPENAI_MODEL` (`gpt-4.1-mini`). It collects the demand profile, AI call settings and creates a campaign plan. `/profile` shows and edits the same data with forms, and regenerates the plan. Every value the model extracts is validated in `src/lib/setup/draft.ts`; plan numbers are computed in `src/lib/setup/plan.ts`. Prompts and JSON schemas are in `src/lib/setup/prompts.ts` — bump the prompt version when changing them. AI calls use `store: false` and are logged per workspace in `usage_records`.
+`/setup` is the setup chat (owners). The app asks the questions and shows answer buttons (`src/lib/setup/questions.ts`); button clicks are mapped in code (no model call, ~1 s); only typed answers go to the model (`OPENAI_CHAT_MODEL`, default `gpt-4.1-nano`, with a compact prompt). The campaign plan uses `OPENAI_MODEL` (`gpt-4.1-mini`). It collects the demand profile, AI call settings and creates a campaign plan. `/profile` shows and edits the same data with forms, and regenerates the plan. Every value the model extracts is validated in `src/lib/setup/draft.ts`; plan numbers are computed in `src/lib/setup/plan.ts`. Prompts and JSON schemas are in `src/lib/setup/prompts.ts` - bump the prompt version when changing them. AI calls use `store: false` and are logged per workspace in `usage_records`.
 
 ### Leads and landing pages (M2)
 
-Every lead or call — from any source — goes through `ingestLead()` (`src/lib/leads/ingest.ts`) → `ingest_lead()` in Postgres. It normalizes phone/email, matches an existing customer by phone or email (under a per-workspace lock), ignores repeat deliveries of the same `source + external_id`, and writes `lead.received` / `customer.created` events. Only the service role can call it; callers must check permission first. Customer status and notes change only through `set_customer_status()` / `update_customer_notes()`, which log an event.
+Every lead or call - from any source - goes through `ingestLead()` (`src/lib/leads/ingest.ts`) -> `ingest_lead()` in Postgres. It normalizes phone/email, matches an existing customer by phone or email (under a per-workspace lock), ignores repeat deliveries of the same `source + external_id`, and writes `lead.received` / `customer.created` events. Only the service role can call it; callers must check permission first. Customer status and notes change only through `set_customer_status()` / `update_customer_notes()`, which log an event.
 
 Landing pages (`/landing-pages`) are template + JSON content (`src/lib/landing/content.ts`), rendered by `src/components/landing/landing-page.tsx` both in the editor preview and publicly at `/p/{slug}`. Public submissions (`src/app/p/actions.ts`) store UTM/click IDs and a consent record; the consent text is versioned (`CONSENT_VERSION`).
 
 ### Imports and call intake (M2)
 
-`/leads/import` (owners) imports a CSV: the browser parses it (`src/lib/leads/csv.ts`), the owner confirms the column mapping, and rows go to `importLeads` in chunks of 200 → `ingest_leads()` (one database call per chunk; a bad row is reported, not fatal). Each row's id is a hash of its content, so re-importing a file adds nothing.
+`/leads/import` (owners) imports a CSV: the browser parses it (`src/lib/leads/csv.ts`), the owner confirms the column mapping, and rows go to `importLeads` in chunks of 200 -> `ingest_leads()` (one database call per chunk; a bad row is reported, not fatal). Each row's id is a hash of its content, so re-importing a file adds nothing.
 
 `POST /api/intake/call` receives calls (payload v1 in `src/lib/intake/call.ts`). Requests must be signed: `X-Lead96-Timestamp: <unix seconds>` and `X-Lead96-Signature: v1=<hex HMAC-SHA256(INTAKE_SIGNING_SECRET, "<timestamp>.<body>")>` (`src/lib/intake/signature.ts`). Responses: 200 stored or already stored · 401 bad signature · 422 invalid / no caller number (don't retry) · 500 retry. Every signed delivery is logged in `webhook_deliveries`. Send a test call with `npm run intake:test-call -- --workspace <id>`.
 
 ### Admin and integration health
 
-`/admin` is for platform admins (`profiles.is_platform_admin`, set in the database — users can't set it themselves). It shows a health card per integration built from `admin_integration_health()` (aggregates only) and the rules in `src/lib/admin/health.ts`, which credentials are set (names only, from env), a per-business table and the webhook delivery feed. **Run live checks** (`src/lib/admin/checks.ts`) calls each service with a free, read-only request. When Meta or Google lead sync ships, flip `BUILT` in `health.ts`.
+`/admin` is for platform admins (`profiles.is_platform_admin`, set in the database - users can't set it themselves). It shows a health card per integration built from `admin_integration_health()` (aggregates only) and the rules in `src/lib/admin/health.ts`, which credentials are set (names only, from env), a per-business table and the webhook delivery feed. **Run live checks** (`src/lib/admin/checks.ts`) calls each service with a free, read-only request. When Meta or Google lead sync ships, flip `BUILT` in `health.ts`.
 
 Agency-model credentials (server env, all optional until that integration is used): `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_ADS_DEVELOPER_TOKEN`, `GOOGLE_ADS_MANAGER_ID`, `GOOGLE_ADS_REFRESH_TOKEN`, `META_APP_ID`, `META_APP_SECRET`, `META_SYSTEM_USER_TOKEN`, `META_BUSINESS_ID`.
 
 ### Google Ads (M2)
 
-Agency model: one Google user with access to the Lead96 manager account signs in once at **Admin → Google Ads** (`/api/google/connect` → `/api/google/callback`). The refresh token is stored AES-256-GCM encrypted in `platform_connections` (key: `CREDENTIALS_ENCRYPTION_KEY`; changing the key means reconnecting). Local and live share the database, so connecting once works for both as long as they use the same key. Each ad account under the manager account is assigned to a business (`ad_accounts`).
+Agency model: one Google user with access to the Lead96 manager account signs in once at **Admin -> Google Ads** (`/api/google/connect` -> `/api/google/callback`). The refresh token is stored AES-256-GCM encrypted in `platform_connections` (key: `CREDENTIALS_ENCRYPTION_KEY`; changing the key means reconnecting). Local and live share the database, so connecting once works for both as long as they use the same key. Each ad account under the manager account is assigned to a business (`ad_accounts`).
 
-- **Real-time leads:** each assigned account has a webhook URL `/api/intake/google-lead/<account id>` and key, pasted into the lead form in Google Ads (Lead delivery → Webhook). Test leads are logged, not stored.
+- **Real-time leads:** each assigned account has a webhook URL `/api/intake/google-lead/<account id>` and key, pasted into the lead form in Google Ads (Lead delivery -> Webhook). Test leads are logged, not stored.
 - **Daily sync:** `/api/cron/google-sync` (Vercel Cron, `vercel.json`, protected by `CRON_SECRET`) pulls lead-form submissions (catch-up) and 3 days of campaign spend into `ad_spend_daily`; **Sync now** in Admin pulls 30 days.
 - API calls are plain REST (`src/lib/google/ads.ts`, version `GOOGLE_ADS_API_VERSION`, default v25); mapping is in `src/lib/google/leads.ts`.
 
 ### ZIP code data
 
-`public.us_zip_codes` holds ~41k US ZIPs with city, state and coordinates, from [GeoNames](https://www.geonames.org) postal codes (CC BY 4.0 — keep the attribution). The CSV is in `supabase/seed/us_zip_codes.csv`; load it with `npm run db:seed:zips` after the migration (idempotent). The setup chat uses `zip_city_matches` / `zips_within` to turn "Miami, 20 miles" into a ZIP list — the AI never generates ZIP codes.
+`public.us_zip_codes` holds ~41k US ZIPs with city, state and coordinates, from [GeoNames](https://www.geonames.org) postal codes (CC BY 4.0 - keep the attribution). The CSV is in `supabase/seed/us_zip_codes.csv`; load it with `npm run db:seed:zips` after the migration (idempotent). The setup chat uses `zip_city_matches` / `zips_within` to turn "Miami, 20 miles" into a ZIP list - the AI never generates ZIP codes.
 
 ### Team invites
 
@@ -87,9 +87,9 @@ Owners invite from **Settings**. Until the email provider is set up, the owner c
 | `npm run lint` | ESLint |
 | `npm test` | Vitest. `tests/rls.test.ts` checks tenant isolation against the linked Supabase project (skipped without env) |
 | `npm run db:push` | Apply migrations to the linked project |
-| `npm run db:push:https` | Same, through the Supabase Management API over HTTPS — use when a VPN blocks Postgres ports. Needs `SUPABASE_ACCESS_TOKEN` in `.env.local`. `-- --dry-run` lists pending migrations |
+| `npm run db:push:https` | Same, through the Supabase Management API over HTTPS - use when a VPN blocks Postgres ports. Needs `SUPABASE_ACCESS_TOKEN` in `.env.local`. `-- --dry-run` lists pending migrations |
 | `npm run db:seed:zips` | Load the US ZIP code table from `supabase/seed/us_zip_codes.csv` |
-| `npm run intake:test-call` | Send a signed test call to `/api/intake/call` (`-- --workspace <id> [--url …] [--status missed] [--source google] [--call-id …]`) |
+| `npm run intake:test-call` | Send a signed test call to `/api/intake/call` (`-- --workspace <id> [--url ...] [--status missed] [--source google] [--call-id ...]`) |
 | `npm run db:types` | Regenerate `src/lib/supabase/database.types.ts` |
 
 ## Layout
@@ -102,7 +102,7 @@ src/
     auth/confirm/         email-link landing (PKCE code / token_hash)
     onboarding/           create the business workspace
     invite/[token]/       accept a team invite
-    (app)/                signed-in app: dashboard, setup, leads, settings, …
+    (app)/                signed-in app: dashboard, setup, leads, settings, ...
   components/ui.tsx       small UI primitives
   lib/
     auth.ts               current user / workspace helpers

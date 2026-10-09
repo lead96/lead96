@@ -1,5 +1,5 @@
 /**
- * CSV lead import: parsing, column guessing and row mapping. Pure — runs in the browser for
+ * CSV lead import: parsing, column guessing and row mapping. Pure - runs in the browser for
  * the preview and is unit-tested. The server re-validates every row (see importLeads).
  */
 import type { Option } from "@/lib/setup/prompts";
@@ -156,7 +156,7 @@ export function rowProblem(r: ImportRow): string | null {
   return "No phone or email";
 }
 
-/** Taxonomy value for a service written as its label or value ("AC repair" → "ac_repair"), else the text. */
+/** Taxonomy value for a service written as its label or value ("AC repair" -> "ac_repair"), else the text. */
 export function matchService(text: string | undefined, services: Option[]): string | undefined {
   if (!text) return undefined;
   const key = text.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
@@ -180,7 +180,7 @@ export function parseLeadDate(input: string, timezone: string, now = new Date())
       reorderUs(s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2}|\d{4})(?:,?\s+(\d{1,2}):(\d{2})(?::(\d{2}))?\s*([ap]m)?)?$/i));
     if (m) {
       const [y, mo, d, h = "", mi = "", sec = "", ampm = ""] = m;
-      let hour = h ? Number(h) : 12; // date only → midday, so the day never shifts across zones
+      let hour = h ? Number(h) : 12; // date only -> midday, so the day never shifts across zones
       if (ampm) {
         if (hour < 1 || hour > 12) return null;
         hour = (hour % 12) + (ampm.toLowerCase() === "pm" ? 12 : 0);

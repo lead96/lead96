@@ -28,7 +28,7 @@ export function ManualLeadForm({ services }: { services: Option[] }) {
       <div className="grid gap-4 sm:grid-cols-2">
         <Field label="Service" htmlFor="service">
           <Select id="service" name="service" defaultValue="">
-            <option value="">—</option>
+            <option value="">-</option>
             {services.map((s) => (
               <option key={s.value} value={s.value}>
                 {s.label}
@@ -50,7 +50,7 @@ export function ManualLeadForm({ services }: { services: Option[] }) {
         />
       </Field>
       <Button type="submit" disabled={pending}>
-        {pending ? "Saving…" : "Add lead"}
+        {pending ? "Saving..." : "Add lead"}
       </Button>
     </form>
   );

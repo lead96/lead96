@@ -77,7 +77,7 @@ describe("lead dates", () => {
   it("reads US and ISO formats in the business time zone, across DST", () => {
     expect(parseLeadDate("10/1/2026 2:15 PM", tz, now)).toBe("2026-10-01T19:15:00.000Z"); // CDT, UTC-5
     expect(parseLeadDate("1/15/26 08:00", tz, now)).toBe("2026-01-15T14:00:00.000Z"); // CST, UTC-6
-    expect(parseLeadDate("2026-03-02", tz, now)).toBe("2026-03-02T18:00:00.000Z"); // date only → midday
+    expect(parseLeadDate("2026-03-02", tz, now)).toBe("2026-03-02T18:00:00.000Z"); // date only -> midday
     expect(parseLeadDate("2026-09-01T10:00:00Z", tz, now)).toBe("2026-09-01T10:00:00.000Z");
     expect(parseLeadDate("12/31/2025 12:00 AM", tz, now)).toBe("2025-12-31T06:00:00.000Z");
   });

@@ -1,6 +1,6 @@
 /**
  * Landing page content: what the simple template editor edits and the templates render.
- * Pure — unit-tested. The four templates share one content shape; each uses what it needs.
+ * Pure - unit-tested. The four templates share one content shape; each uses what it needs.
  */
 import { z } from "zod";
 
@@ -45,7 +45,7 @@ export function defaultContent(template: TemplateKey, opts: { businessName: stri
     business_name: opts.businessName,
     headline:
       template === "seasonal_offer"
-        ? "Beat the heat — AC tune-up special"
+        ? "Beat the heat - AC tune-up special"
         : template === "call_first"
           ? `Fast, reliable HVAC service in ${area}`
           : `Get a free HVAC quote in ${area}`,
@@ -72,7 +72,7 @@ export function readContent(stored: unknown, fallback: LandingContent): LandingC
 
 export const SLUG_PATTERN = /^[a-z0-9](?:[a-z0-9-]{1,58}[a-z0-9])$/;
 
-/** "Cool Air HVAC — Miami!" → "cool-air-hvac-miami" (3–60 chars, matches the DB check). */
+/** "Cool Air HVAC - Miami!" -> "cool-air-hvac-miami" (3-60 chars, matches the DB check). */
 export function slugify(input: string): string {
   const s = input
     .normalize("NFKD")
@@ -86,7 +86,7 @@ export function slugify(input: string): string {
   return s.length >= 3 ? s : `${s || "page"}-${Math.random().toString(36).slice(2, 6)}`;
 }
 
-/** Hex color → readable text color on top of it. */
+/** Hex color -> readable text color on top of it. */
 export function textOn(hex: string) {
   const n = parseInt(hex.slice(1), 16);
   const [r, g, b] = [(n >> 16) & 255, (n >> 8) & 255, n & 255];

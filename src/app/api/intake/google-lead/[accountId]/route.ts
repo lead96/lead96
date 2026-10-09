@@ -39,7 +39,7 @@ export async function POST(request: Request, ctx: RouteContext<"/api/intake/goog
   const key = typeof (json as { google_key?: unknown })?.google_key === "string" ? (json as { google_key: string }).google_key : "";
   if (!safeEqual(key, account.webhook_key)) {
     // Logged without the body: it didn't come with our key.
-    log({ status: "rejected", error: "wrong google_key — check the key in the lead form's webhook settings", payload: null });
+    log({ status: "rejected", error: "wrong google_key - check the key in the lead form's webhook settings", payload: null });
     return Response.json({ error: "invalid_key" }, { status: 401 });
   }
   if (!parsed.success) {

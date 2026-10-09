@@ -1,3 +1,4 @@
+import { CheckCircle2, ChevronRight, Circle } from "lucide-react";
 import Link from "next/link";
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
@@ -63,7 +64,7 @@ export default async function AdminPage({ searchParams }: PageProps<"/admin">) {
   const googleConnected = Boolean(await getConnection());
   const integrations = buildIntegrations(r, (key) => (key === "GOOGLE_ADS_CONNECTION" ? googleConnected : Boolean(env[key])));
   const overall = overallState(integrations);
-  const ago = (iso: string | null | undefined) => (iso ? timeAgo(iso, TZ) : "—");
+  const ago = (iso: string | null | undefined) => (iso ? timeAgo(iso, TZ) : "-");
 
   return (
     <>
@@ -193,7 +194,7 @@ function IntegrationCard({ integration: i, ago }: { integration: Integration; ag
           <div key={st.label}>
             <dt className="text-xs text-slate-500">{st.label}</dt>
             <dd className="font-medium text-slate-900">
-              {st.time ? ago(st.value as string | null) : typeof st.value === "number" ? st.value.toLocaleString("en-US") : (st.value ?? "—")}
+              {st.time ? ago(st.value as string | null) : typeof st.value === "number" ? st.value.toLocaleString("en-US") : (st.value ?? "-")}
             </dd>
           </div>
         ))}
@@ -207,16 +208,17 @@ function IntegrationCard({ integration: i, ago }: { integration: Integration; ag
         </div>
       ) : null}
       {i.href ? (
-        <Link href={i.href} className="mt-4 text-sm font-medium text-brand-700 hover:underline">
-          Manage {i.name} →
+        <Link href={i.href} className="mt-4 inline-flex items-center gap-1 text-sm font-medium text-brand-700 hover:underline">
+          Manage {i.name}
+          <ChevronRight size={16} aria-hidden />
         </Link>
       ) : null}
       {i.config ? (
         <ul className="mt-4 space-y-1 border-t border-slate-100 pt-3 text-xs">
           {i.config.map((c) => (
             <li key={c.key} className="flex items-center gap-2">
-              <span aria-hidden className={c.set ? "text-emerald-600" : "text-slate-400"}>
-                {c.set ? "✓" : "○"}
+              <span aria-hidden className={c.set ? "text-emerald-600" : "text-slate-300"}>
+                {c.set ? <CheckCircle2 size={14} /> : <Circle size={14} />}
               </span>
               <span className={c.set ? "text-slate-700" : "text-slate-500"}>{c.label}</span>
               <code className="ml-auto text-[10px] text-slate-400">{c.key}</code>

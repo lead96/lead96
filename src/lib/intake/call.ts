@@ -1,6 +1,6 @@
 /**
- * Call intake payload (v1). Every phone call to a business — answered by the AI agent, a person,
- * voicemail or missed — becomes a lead of kind "call". The M3 voice service maps its provider's
+ * Call intake payload (v1). Every phone call to a business - answered by the AI agent, a person,
+ * voicemail or missed - becomes a lead of kind "call". The M3 voice service maps its provider's
  * events (Twilio etc.) to this shape and posts it, signed, to /api/intake/call.
  */
 import { z } from "zod";
@@ -43,7 +43,7 @@ export const callPayloadSchema = z.object({
       fbclid: text(300),
     })
     .nullish(),
-  /** Answers the AI agent collected (question key → answer). */
+  /** Answers the AI agent collected (question key -> answer). */
   answers: z.record(z.string().max(60), z.union([z.string().max(1000), z.number(), z.boolean()])).optional(),
 });
 export type CallPayload = z.infer<typeof callPayloadSchema>;

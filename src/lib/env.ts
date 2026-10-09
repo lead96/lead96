@@ -19,7 +19,7 @@ const serverSchema = publicSchema.extend({
   /** Vercel Cron sends it as a Bearer token; scheduled syncs are refused without it. */
   CRON_SECRET: z.string().min(16).optional(),
   // Google Ads via the Lead96 manager account (agency model). The sign-in itself is stored
-  // encrypted in platform_connections (Admin → Google Ads → Connect).
+  // encrypted in platform_connections (Admin -> Google Ads -> Connect).
   GOOGLE_CLIENT_ID: z.string().min(1).optional(),
   GOOGLE_CLIENT_SECRET: z.string().min(1).optional(),
   GOOGLE_ADS_DEVELOPER_TOKEN: z.string().min(1).optional(),

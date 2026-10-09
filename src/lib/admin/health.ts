@@ -1,6 +1,6 @@
 /**
  * Integration health for the Admin page: turns the numbers from admin_integration_health() and
- * which credentials are set into one status per integration. Pure — unit-tested.
+ * which credentials are set into one status per integration. Pure - unit-tested.
  */
 
 export type DeliveryStats = {
@@ -57,7 +57,7 @@ export type Integration = {
   href?: string;
 };
 
-/** Credentials each integration needs (names only — values never leave the server). */
+/** Credentials each integration needs (names only - values never leave the server). */
 export const CONFIG: Record<string, { key: string; label: string }[]> = {
   call: [{ key: "INTAKE_SIGNING_SECRET", label: "Intake signing secret" }],
   openai: [{ key: "OPENAI_API_KEY", label: "OpenAI API key" }],
@@ -67,7 +67,7 @@ export const CONFIG: Record<string, { key: string; label: string }[]> = {
     { key: "GOOGLE_ADS_DEVELOPER_TOKEN", label: "Google Ads developer token" },
     { key: "GOOGLE_ADS_MANAGER_ID", label: "Manager account (MCC) ID" },
     { key: "CREDENTIALS_ENCRYPTION_KEY", label: "Encryption key for stored sign-ins" },
-    { key: "GOOGLE_ADS_CONNECTION", label: "Google Ads sign-in (Admin → Google Ads)" },
+    { key: "GOOGLE_ADS_CONNECTION", label: "Google Ads sign-in (Admin > Google Ads)" },
   ],
   meta: [
     { key: "META_APP_ID", label: "Meta app ID" },
@@ -127,12 +127,12 @@ export function buildIntegrations(r: HealthReport, isSet: (key: string) => boole
         { label: "Tokens 7 days", value: r.ai.tokens_7d },
         { label: "Last use", value: r.ai.last_at, time: true },
       ];
-      if (missing(items).length) return { key: "openai", name: "OpenAI", state: "setup" as const, summary: "API key missing — the setup chat can't run.", stats, config: items };
+      if (missing(items).length) return { key: "openai", name: "OpenAI", state: "setup" as const, summary: "API key missing - the setup chat can't run.", stats, config: items };
       return {
         key: "openai",
         name: "OpenAI",
         state: r.ai.last_at ? ("ok" as const) : ("idle" as const),
-        summary: r.ai.last_at ? "Key set. Use “Run live checks” to confirm it works." : "Key set, not used yet.",
+        summary: r.ai.last_at ? "Key set. Use 'Run live checks' to confirm it works." : "Key set, not used yet.",
         stats,
         config: items,
       };
@@ -172,7 +172,7 @@ function webhook(
   }
   if (s.failed_24h) return { ...base, state: "warning", summary: `${plural(s.failed_24h, "temporary failure")} in 24 h, recovered since.` };
   if (s.invalid_24h) {
-    return { ...base, state: "warning", summary: `${plural(s.invalid_24h, "delivery", "deliveries")} rejected in 24 h for bad data — check the sender.` };
+    return { ...base, state: "warning", summary: `${plural(s.invalid_24h, "delivery", "deliveries")} rejected in 24 h for bad data - check the sender.` };
   }
   return { ...base, state: "ok", summary: s.ok_24h ? `${plural(s.ok_24h, noun.replace(/s$/, ""), noun)} in the last 24 h.` : `Working. Nothing received in the last 24 h.` };
 }

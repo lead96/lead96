@@ -3,7 +3,7 @@ import { createAdminClient } from "@/lib/supabase/server";
 
 export type DeliveryStatus = "processed" | "duplicate" | "rejected" | "failed" | "test";
 
-/** Records one webhook delivery (shown in Admin → integration health). Never throws. */
+/** Records one webhook delivery (shown in Admin -> integration health). Never throws. */
 export async function logDelivery(d: {
   provider: "call" | "meta" | "google";
   status: DeliveryStatus;

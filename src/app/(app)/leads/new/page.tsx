@@ -15,7 +15,7 @@ export default async function NewLeadPage() {
     <>
       <PageHeader
         title="Add lead"
-        description="For leads that come in another way — a walk-in, a referral, a call to your own number."
+        description="For leads that come in another way - a walk-in, a referral, a call to your own number."
         back={{ href: "/leads", label: "Leads" }}
       />
       <Card className="max-w-xl p-6">

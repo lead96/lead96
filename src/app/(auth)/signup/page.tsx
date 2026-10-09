@@ -30,7 +30,7 @@ export default async function SignupPage({ searchParams }: PageProps<"/signup">)
       <input type="hidden" name="next" value={nextPath} />
       {intent ? (
         <div className="rounded-md bg-slate-50 px-3 py-2 text-sm text-slate-600">
-          You asked for: <span className="font-medium text-slate-900">“{intent}”</span>
+          You asked for: <span className="font-medium text-slate-900">&quot;{intent}&quot;</span>
           <input type="hidden" name="intent" value={intent} />
         </div>
       ) : null}

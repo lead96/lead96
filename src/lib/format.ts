@@ -20,7 +20,7 @@ export function timeAgo(iso: string, timeZone: string, now = Date.now()) {
   return new Intl.DateTimeFormat("en-US", { timeZone, month: "short", day: "numeric" }).format(new Date(iso));
 }
 
-/** +13055550101 → (305) 555-0101 */
+/** +13055550101 -> (305) 555-0101 */
 export function formatPhone(e164: string | null | undefined) {
   const m = e164?.match(/^\+1(\d{3})(\d{3})(\d{4})$/);
   return m ? `(${m[1]}) ${m[2]}-${m[3]}` : (e164 ?? "");

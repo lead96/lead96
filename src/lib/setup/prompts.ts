@@ -27,7 +27,7 @@ export function setupTurnSchema(ctx: SetupContext) {
       reply: {
         type: "string",
         description:
-          "If understood: a 3–10 word acknowledgement of what you took from the message. If not understood: one short clarifying question or a one-sentence answer (≤ 30 words).",
+          "If understood: a 3-10 word acknowledgement of what you took from the message. If not understood: one short clarifying question or a one-sentence answer (<= 30 words).",
       },
       understood: {
         type: "boolean",
@@ -112,13 +112,13 @@ Pending question: "${pending.text.replace(/\s+/g, " ").slice(0, 200)}"
 Rules:
 - updates = only facts in the latest message; null = no change; never invent values or ZIP codes. A list replaces the old list, so send the full new list (known values below).
 - services: ${opts(ctx.services)}. customer_types: ${opts(ctx.customerTypes)}. lead_types: call, form. "All"/"everything" = every value of that list.
-- Hours → 24h HH:MM per weekday. Budget = monthly USD; a daily/weekly amount → understood=false and ask for the monthly total.
-- A place instead of ZIPs (city, area, "around X", "X, 20 miles") → area_lookup (city; 2-letter state if stated or obvious; radius_miles only if stated; center_zip if a ZIP is the centre) and zip_codes null. Typed ZIP codes → zip_codes.
-- The owner may answer a different question or change an earlier answer — extract whatever they state.
-- A new call question → extra_questions (full list) and questions_confirmed=true. "Fine"/"looks good" about the questions → questions_confirmed=true.
+- Hours -> 24h HH:MM per weekday. Budget = monthly USD; a daily/weekly amount -> understood=false and ask for the monthly total.
+- A place instead of ZIPs (city, area, "around X", "X, 20 miles") -> area_lookup (city; 2-letter state if stated or obvious; radius_miles only if stated; center_zip if a ZIP is the centre) and zip_codes null. Typed ZIP codes -> zip_codes.
+- The owner may answer a different question or change an earlier answer - extract whatever they state.
+- A new call question -> extra_questions (full list) and questions_confirmed=true. "Fine"/"looks good" about the questions -> questions_confirmed=true.
 - Optional facts (appointment length, target cost per appointment) only if mentioned.
 - area_lookup only when the LATEST message names a place; otherwise null.
-- reply: if understood, "OK"; otherwise one short clarifying question (≤ 25 words). Never say "saved", never list ZIP codes, never promise results.
+- reply: if understood, "OK"; otherwise one short clarifying question (<= 25 words). Never say "saved", never list ZIP codes, never promise results.
 
 Known: ${JSON.stringify(compactDraft(draft))}`;
 }
@@ -145,7 +145,7 @@ export const planSchema = {
   additionalProperties: false,
   required: ["summary", "channels", "landing_page_template", "template_reason", "targeting_notes", "first_steps"],
   properties: {
-    summary: { type: "string", description: "2–4 plain-English sentences for the owner." },
+    summary: { type: "string", description: "2-4 plain-English sentences for the owner." },
     channels: {
       type: "array",
       items: {
@@ -169,11 +169,11 @@ export const planSchema = {
 export function planSystemPrompt() {
   return `You are a senior performance marketer for US home-service contractors. Write a starting campaign plan for an HVAC business from its setup data.
 Rules:
-- Recommend a budget split across the allowed channels (share_percent sums to 100). Use 1–3 channels; small budgets (< $1,500/month) should focus on 1–2.
+- Recommend a budget split across the allowed channels (share_percent sums to 100). Use 1-3 channels; small budgets (< $1,500/month) should focus on 1-2.
 - If the business only wants phone calls, favour call-focused options and a call-first landing page. If it wants forms only, avoid call ads.
 - Choose one landing page template and say why in one sentence.
 - Plain English for a contractor with no ads experience. No jargon, no guarantees, no lead-volume or cost predictions.
-- targeting_notes: 1–2 sentences about who and where to target (use the given service area, do not invent ZIP codes).
-- first_steps: 3–5 short actions the owner takes next in Lead96 (e.g. connect Google Ads, review landing page).
+- targeting_notes: 1-2 sentences about who and where to target (use the given service area, do not invent ZIP codes).
+- first_steps: 3-5 short actions the owner takes next in Lead96 (e.g. connect Google Ads, review landing page).
 - This is a recommendation only; nothing is launched automatically.`;
 }

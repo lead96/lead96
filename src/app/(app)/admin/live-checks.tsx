@@ -16,7 +16,7 @@ export function LiveChecks() {
         </div>
         <form action={run}>
           <Button type="submit" variant="secondary" disabled={pending}>
-            {pending ? "Checking…" : state?.checks ? "Run again" : "Run live checks"}
+            {pending ? "Checking..." : state?.checks ? "Run again" : "Run live checks"}
           </Button>
         </form>
       </div>

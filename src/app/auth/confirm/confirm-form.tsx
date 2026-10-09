@@ -43,7 +43,7 @@ export function ConfirmForm({
       <input type="hidden" name="type" value={type} />
       <input type="hidden" name="next" value={next} />
       <Button type="submit" className="w-full" disabled={pending}>
-        {pending ? "Checking…" : label}
+        {pending ? "Checking..." : label}
       </Button>
     </form>
   );

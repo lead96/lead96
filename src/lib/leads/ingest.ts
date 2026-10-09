@@ -8,8 +8,8 @@ export type IngestResult =
 
 /**
  * The single entry point for new leads and calls from every source. Runs with the service
- * role — callers must already have checked who is allowed to add leads to this workspace
- * (a signed-in member, a published landing page, a verified webhook…).
+ * role - callers must already have checked who is allowed to add leads to this workspace
+ * (a signed-in member, a published landing page, a verified webhook...).
  */
 export async function ingestLead(raw: RawLead): Promise<IngestResult> {
   const normalized = normalizeLead(raw);
@@ -28,7 +28,7 @@ export type BulkRowResult =
   | { ok: true; customerId: string; customerCreated: boolean; duplicate: boolean }
   | { ok: false; error: string };
 
-/** ingestLead for many rows in one database call (≤ 500). Results keep the input order. */
+/** ingestLead for many rows in one database call (<= 500). Results keep the input order. */
 export async function ingestLeads(raws: RawLead[]): Promise<BulkRowResult[]> {
   const results: (BulkRowResult | null)[] = raws.map(() => null);
   const batch: { index: number; lead: unknown }[] = [];

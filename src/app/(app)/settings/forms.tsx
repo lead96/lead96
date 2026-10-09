@@ -43,7 +43,7 @@ export function BusinessForm({
       </fieldset>
       {!disabled ? (
         <Button type="submit" disabled={pending}>
-          {pending ? "Saving…" : "Save"}
+          {pending ? "Saving..." : "Save"}
         </Button>
       ) : null}
     </form>

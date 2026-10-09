@@ -122,7 +122,7 @@ describe("Google Ads API lead rows", () => {
       names,
     );
     expect(lead).toMatchObject({
-      external_id: "gclid:Cj0KCQjw-test", // same as the webhook → stored once
+      external_id: "gclid:Cj0KCQjw-test", // same as the webhook -> stored once
       campaign_id: "111",
       campaign_name: "AC Repair Miami",
       adset_id: "222",

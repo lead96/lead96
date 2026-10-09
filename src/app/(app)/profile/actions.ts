@@ -76,7 +76,7 @@ export async function saveDemandProfile(_: ProfileState, formData: FormData): Pr
   if (rejected.length) {
     const first = rejected[0].split(":")[0];
     const label = REQUIRED_FIELDS.find((f) => f.key === first)?.label ?? first.replaceAll("_", " ");
-    return { error: `Please check “${label}”. ${rejected[0].split(": ").slice(1).join(": ")}` };
+    return { error: `Please check '${label}'. ${rejected[0].split(": ").slice(1).join(": ")}` };
   }
   const missing = missingFields(draft).filter((k) => k !== "transfer_phone" && k !== "questions_confirmed");
   if (missing.length) {

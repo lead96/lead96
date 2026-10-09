@@ -30,7 +30,7 @@ export function OnboardingForm() {
           </Select>
         </Field>
         <Button type="submit" className="w-full" disabled={pending}>
-          {pending ? "Creating…" : "Continue"}
+          {pending ? "Creating..." : "Continue"}
         </Button>
       </form>
     </Card>

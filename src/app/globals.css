@@ -5,7 +5,7 @@
  *   Electric Blue #3B82F6 · Purple #8B5CF6 · Mint #10B981 · Dark #0B0F19
  * Blue is the action colour. Purple appears only as the gradient end in the
  * logo mark and a thin accent. Mint = success. Dark = text on light surfaces.
- * Look: light SaaS — white sidebar and cards on a pale gray page, soft shadows, no effects.
+ * Look: light SaaS - white sidebar and cards on a pale gray page, soft shadows, no effects.
  */
 @theme {
   --color-brand-50: #eff6ff;
@@ -25,4 +25,13 @@
 body {
   background: var(--color-page);
   color: #0f172a;
+}
+
+/* Faint grid behind the home-page hero, fading out toward the edges. */
+.hero-grid {
+  background-image:
+    linear-gradient(to right, rgb(15 23 42 / 0.05) 1px, transparent 1px),
+    linear-gradient(to bottom, rgb(15 23 42 / 0.05) 1px, transparent 1px);
+  background-size: 44px 44px;
+  mask-image: radial-gradient(ellipse 70% 60% at 50% 0%, #000 40%, transparent 100%);
 }
