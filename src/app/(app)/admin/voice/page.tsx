@@ -4,7 +4,8 @@ import { Alert, Badge, Card, PageHeader, Section } from "@/components/ui";
 import { getProfile } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/server";
 import { listNumbers, retellConfigured, RetellError, type RetellNumber } from "@/lib/voice/retell";
-import { AssignNumberForm, BuyNumberForm } from "./forms";
+import { timeAgo } from "@/lib/format";
+import { AssignNumberForm, BuyNumberForm, SyncAgentForm, TestCall } from "./forms";
 
 export const metadata: Metadata = { title: "AI voice" };
 
@@ -15,10 +16,12 @@ export default async function VoiceAdminPage() {
   if (!profile?.is_platform_admin) redirect("/dashboard");
 
   const db = createAdminClient();
-  const [{ data: businesses }, { data: assigned }] = await Promise.all([
-    db.from("workspaces").select("id, name").order("name"),
+  const [{ data: businesses }, { data: assigned }, { data: agents }] = await Promise.all([
+    db.from("workspaces").select("id, name, setup_completed_at").order("name"),
     db.from("phone_numbers").select("e164, workspace_id"),
+    db.from("voice_agents").select("workspace_id, retell_agent_id, version, synced_at, last_error, last_error_at, auto_call"),
   ]);
+  const agentOf = new Map((agents ?? []).map((a) => [a.workspace_id, a]));
   const assignedTo = new Map((assigned ?? []).map((a) => [a.e164, a.workspace_id as string | null]));
   const businessName = new Map((businesses ?? []).map((b) => [b.id, b.name]));
 
@@ -71,6 +74,45 @@ export default async function VoiceAdminPage() {
             })}
           </div>
         </Section>
+
+        {configured ? (
+          <Section
+            title="AI callers"
+            description="One AI caller per business, built from its setup (services, area, hours, questions, transfer number). Update after the setup changes."
+          >
+            <div className="space-y-4">
+              {(businesses ?? []).map((b) => {
+                const a = agentOf.get(b.id);
+                const numbersOf = (assigned ?? []).filter((n) => n.workspace_id === b.id).map((n) => pretty(n.e164));
+                return (
+                  <Card key={b.id} className="space-y-4 p-6" data-business={b.id}>
+                    <div className="flex flex-wrap items-start justify-between gap-4">
+                      <div className="min-w-0">
+                        <p className="font-semibold text-slate-900">{b.name}</p>
+                        <div className="mt-1.5 flex flex-wrap gap-1.5">
+                          {a?.retell_agent_id ? <Badge tone="green">AI caller v{a.version}</Badge> : <Badge>No AI caller</Badge>}
+                          {!b.setup_completed_at ? <Badge tone="amber">Setup not finished</Badge> : null}
+                          {a?.auto_call ? <Badge tone="blue">Calls new leads</Badge> : null}
+                          {numbersOf.length ? <Badge>{numbersOf.join(", ")}</Badge> : <Badge>No number</Badge>}
+                        </div>
+                        {a?.synced_at ? <p className="mt-1.5 text-xs text-slate-500">Updated {timeAgo(a.synced_at, "America/New_York")}</p> : null}
+                        {a?.last_error ? <p className="mt-1.5 text-xs text-red-600">{a.last_error}</p> : null}
+                      </div>
+                      <SyncAgentForm workspaceId={b.id} exists={Boolean(a?.retell_agent_id)} />
+                    </div>
+                    {a?.retell_agent_id ? (
+                      <div className="border-t border-slate-100 pt-4">
+                        <p className="mb-2 text-sm font-medium text-slate-900">Test call</p>
+                        <p className="mb-3 text-xs text-slate-500">Talk to the AI caller with your microphone, as a new lead would. No phone number needed.</p>
+                        <TestCall workspaceId={b.id} />
+                      </div>
+                    ) : null}
+                  </Card>
+                );
+              })}
+            </div>
+          </Section>
+        ) : null}
 
         {configured ? (
           <Section title="Buy a number" description="A US number in the Lead96 Retell account, billed monthly to the card on that account.">

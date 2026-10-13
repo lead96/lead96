@@ -1,5 +1,7 @@
 import "server-only";
 import { serverEnv } from "@/lib/env";
+import type { VoiceAgentConfig } from "./agent-config";
+import type { RetellCall } from "./calls";
 
 /** Lead96's Retell account (agency model): agents, phone numbers and calls for every business. */
 const BASE = "https://api.retellai.com";
@@ -39,6 +41,92 @@ export async function retell<T>(method: "GET" | "POST" | "PATCH" | "DELETE", pat
     throw new RetellError(res.status, `Retell ${res.status}: ${msg || res.statusText}`);
   }
   return json as T;
+}
+
+// ---------------------------------------------------------------------------
+// Agents (one Retell LLM + one agent per business)
+// ---------------------------------------------------------------------------
+
+export type AgentIds = { llmId: string; agentId: string };
+
+function llmBody(c: VoiceAgentConfig) {
+  const tools: Record<string, unknown>[] = [
+    {
+      type: "end_call",
+      name: "end_call",
+      description: "End the call when the conversation is finished, they asked not to be called, it is a wrong number, or you reached voicemail.",
+    },
+  ];
+  if (c.transferPhone) {
+    tools.push({
+      type: "transfer_call",
+      name: "transfer_to_team",
+      description: "Transfer the caller to the business team when they ask for a person, or after giving safety advice in an emergency.",
+      transfer_destination: { type: "predefined", number: c.transferPhone },
+      transfer_option: {
+        type: "warm_transfer",
+        on_hold_music: "ringtone",
+        private_handoff_option: {
+          type: "prompt",
+          prompt: "Briefly tell the team member who is calling, what they need and anything urgent, so they can take over.",
+        },
+      },
+      speak_during_execution: true,
+      execution_message_description: "Tell them you are connecting them with the team now.",
+    });
+  }
+  return {
+    model: serverEnv().RETELL_LLM_MODEL,
+    model_temperature: 0.2,
+    start_speaker: "agent",
+    general_prompt: c.prompt,
+    begin_message: c.beginMessage,
+    default_dynamic_variables: c.dynamicDefaults,
+    general_tools: tools,
+  };
+}
+
+function agentBody(c: VoiceAgentConfig, llmId: string, webhookUrl: string) {
+  return {
+    agent_name: c.agentName,
+    response_engine: { type: "retell-llm", llm_id: llmId },
+    voice_id: serverEnv().RETELL_VOICE_ID,
+    language: "en-US",
+    webhook_url: webhookUrl,
+    webhook_events: ["call_started", "call_ended", "call_analyzed"],
+    post_call_analysis_data: c.analysis,
+    end_call_after_silence_ms: 20_000,
+    max_call_duration_ms: 15 * 60_000,
+    ring_duration_ms: 30_000,
+    enable_dnc_detection: true,
+    voicemail_option: { action: { type: "hangup" } },
+    data_storage_setting: "everything",
+  };
+}
+
+/** Creates the business's Retell LLM and agent, or updates them in place. */
+export async function upsertAgent(c: VoiceAgentConfig, existing: Partial<AgentIds>, webhookUrl: string): Promise<AgentIds> {
+  const llm = existing.llmId
+    ? await retell<{ llm_id: string }>("PATCH", `/update-retell-llm/${existing.llmId}`, llmBody(c))
+    : await retell<{ llm_id: string }>("POST", "/create-retell-llm", llmBody(c));
+  const body = agentBody(c, llm.llm_id, webhookUrl);
+  const agent = existing.agentId
+    ? await retell<{ agent_id: string }>("PATCH", `/update-agent/${existing.agentId}`, body)
+    : await retell<{ agent_id: string }>("POST", "/create-agent", body);
+  return { llmId: llm.llm_id, agentId: agent.agent_id };
+}
+
+/** A browser call to the agent (no phone number needed): returns the token the web SDK joins with. */
+export async function createWebCall(agentId: string, variables: Record<string, string>, metadata: Record<string, string>) {
+  return retell<{ call_id: string; access_token: string; transport?: "livekit" | "gateway"; url?: string; ice_servers?: RTCIceServer[] }>("POST", "/v3/create-web-call", {
+    agent_id: agentId,
+    retell_llm_dynamic_variables: variables,
+    metadata,
+  });
+}
+
+export async function getCall(callId: string) {
+  return retell<RetellCall>("GET", `/v2/get-call/${encodeURIComponent(callId)}`);
 }
 
 // ---------------------------------------------------------------------------

@@ -72,6 +72,15 @@ Agency model: one Google user with access to the Lead96 manager account signs in
 - **Daily sync:** `/api/cron/google-sync` (Vercel Cron, `vercel.json`, protected by `CRON_SECRET`) pulls lead-form submissions (catch-up) and 3 days of campaign spend into `ad_spend_daily`; **Sync now** in Admin pulls 30 days.
 - API calls are plain REST (`src/lib/google/ads.ts`, version `GOOGLE_ADS_API_VERSION`, default v25); mapping is in `src/lib/google/leads.ts`.
 
+### AI voice (M3)
+
+Lead96 owns one Retell account (agency model). Each business gets its own Retell LLM + agent, built from its setup by `src/lib/voice/agent-config.ts` (services, area, visit hours, qualification questions, transfer number, emergency rules; the AI says it is an AI and that the call may be recorded). **Admin > AI voice** creates/updates it ("Update from setup" only pushes when something changed; every pushed config is kept in `voice_agent_versions`), runs a **browser test call** (microphone, no phone number needed), buys US numbers and assigns them to businesses.
+
+- **Webhook:** `POST /api/voice/retell` (agent `webhook_url`), signed with the Retell API key (`x-retell-signature: v=<ms>,d=<hmac>`, 5 min). Saves each call in `calls` (status, outcome, summary, answers, transcript, cost), copies the recording into the private `call-recordings` bucket, adds a `call.completed` timeline event, moves the customer forward (new/contacted to contacted/qualified), sets `do_not_call` when asked, logs voice minutes in `usage_records`. Inbound calls become call leads for the caller. Retell cannot reach localhost, so agents synced from a local app send webhooks to https://lead96.com (same database).
+- **Outcome:** how the call ended first (no answer, voicemail, transfer, do-not-call), then the AI's own analysis; unsure (confidence below 0.6), unclear or emergency calls get `needs_review`.
+- **Numbers:** Retell needs a one-time identity check (KYC) before numbers can be bought by API; it starts when the first number is bought in the Retell dashboard.
+- Env: `RETELL_API_KEY` (required), `RETELL_VOICE_ID` (default retell-Cimo), `RETELL_LLM_MODEL` (default gpt-5.6-terra); `TWILIO_ACCOUNT_SID` / `TWILIO_AUTH_TOKEN` for SMS later.
+
 ### ZIP code data
 
 `public.us_zip_codes` holds ~41k US ZIPs with city, state and coordinates, from [GeoNames](https://www.geonames.org) postal codes (CC BY 4.0 - keep the attribution). The CSV is in `supabase/seed/us_zip_codes.csv`; load it with `npm run db:seed:zips` after the migration (idempotent). The setup chat uses `zip_city_matches` / `zips_within` to turn "Miami, 20 miles" into a ZIP list - the AI never generates ZIP codes.

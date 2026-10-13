@@ -3,7 +3,9 @@
 import { revalidatePath } from "next/cache";
 import { getProfile } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/server";
-import { bindNumber, buyNumber, RetellError } from "@/lib/voice/retell";
+import { leadCallVariables } from "@/lib/voice/agent-config";
+import { currentAgentConfig, syncVoiceAgent } from "@/lib/voice/agents";
+import { bindNumber, buyNumber, createWebCall, RetellError } from "@/lib/voice/retell";
 
 async function requirePlatformAdmin() {
   const profile = await getProfile();
@@ -92,4 +94,45 @@ export async function assignNumberAction(_: NumberState, formData: FormData): Pr
   await audit(profile.id, workspaceId ? "voice.number_assigned" : "voice.number_unassigned", e164, {}, workspaceId);
   revalidatePath("/admin/voice");
   return { message: workspaceId ? `Assigned to ${name}.` : "Not assigned." };
+}
+
+export type SyncAgentState = { error?: string; message?: string } | undefined;
+
+/** Builds the business's AI caller from its setup and creates/updates it in Retell. */
+export async function syncAgentAction(_: SyncAgentState, formData: FormData): Promise<SyncAgentState> {
+  const profile = await requirePlatformAdmin();
+  const workspaceId = String(formData.get("workspace_id") ?? "");
+  if (!workspaceId) return { error: "Missing business." };
+  const r = await syncVoiceAgent(workspaceId, profile.id, { force: formData.get("force") === "1" });
+  if (r.status === "error") return { error: r.error };
+  if (r.status !== "unchanged") await audit(profile.id, `voice.agent_${r.status}`, r.agentId, { version: r.version }, workspaceId);
+  revalidatePath("/admin/voice");
+  return { message: r.status === "unchanged" ? `Already up to date (version ${r.version}).` : `AI caller ${r.status} (version ${r.version}).` };
+}
+
+export type TestCallState =
+  | { error?: string; accessToken?: string; callId?: string; transport?: "livekit" | "gateway"; url?: string; iceServers?: RTCIceServer[] }
+  | undefined;
+
+/** Starts a browser test call with the business's AI caller, as if calling back a new lead. */
+export async function startTestCallAction(_: TestCallState, formData: FormData): Promise<TestCallState> {
+  const profile = await requirePlatformAdmin();
+  const workspaceId = String(formData.get("workspace_id") ?? "");
+  const { data: agent } = await createAdminClient().from("voice_agents").select("retell_agent_id").eq("workspace_id", workspaceId).maybeSingle();
+  const config = await currentAgentConfig(workspaceId);
+  if (!agent?.retell_agent_id || !config) return { error: "Create the AI caller first." };
+  const name = String(formData.get("lead_name") ?? "").trim().slice(0, 80) || "Maria Lopez";
+  const service = String(formData.get("lead_service") ?? "").trim().slice(0, 80) || "AC repair";
+  const zip = String(formData.get("lead_zip") ?? "").trim().slice(0, 10) || "unknown";
+  try {
+    const call = await createWebCall(
+      agent.retell_agent_id,
+      leadCallVariables(config, { full_name: name, service: null, zip, source: "test", serviceLabel: service, known: false }),
+      { workspace_id: workspaceId, trigger: "test", started_by: profile.id },
+    );
+    await audit(profile.id, "voice.test_call", call.call_id, {}, workspaceId);
+    return { accessToken: call.access_token, callId: call.call_id, transport: call.transport, url: call.url, iceServers: call.ice_servers };
+  } catch (e) {
+    return { error: e instanceof RetellError ? e.message : "Could not start the test call." };
+  }
 }

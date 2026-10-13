@@ -5,7 +5,7 @@ export type DeliveryStatus = "processed" | "duplicate" | "rejected" | "failed" |
 
 /** Records one webhook delivery (shown in Admin -> integration health). Never throws. */
 export async function logDelivery(d: {
-  provider: "call" | "meta" | "google";
+  provider: "call" | "meta" | "google" | "retell";
   status: DeliveryStatus;
   error?: string;
   leadId?: string;

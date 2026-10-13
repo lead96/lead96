@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { buildAgentConfig, configHash, leadCallVariables, type AgentInput } from "@/lib/voice/agent-config";
+import { callRowFromRetell, deriveOutcome, statusAfterCall, type RetellCall } from "@/lib/voice/calls";
 import { signRetell, verifyRetell } from "@/lib/voice/signature";
 
 const input: AgentInput = {
@@ -84,5 +85,75 @@ describe("Retell signature", () => {
     expect(verifyRetell(body, "key_1", signRetell(body, "key_1", Date.now() - 6 * 60_000))).toBe(false);
     expect(verifyRetell(body, "key_1", "nonsense")).toBe(false);
     expect(verifyRetell(body, "key_1", null)).toBe(false);
+  });
+});
+
+
+const ended = (over: Partial<RetellCall> = {}): RetellCall => ({
+  call_id: "c1",
+  call_status: "ended",
+  direction: "outbound",
+  start_timestamp: 1_790_000_000_000,
+  end_timestamp: 1_790_000_095_000,
+  duration_ms: 95_000,
+  disconnection_reason: "agent_hangup",
+  transcript_object: [
+    { role: "agent", content: "Hi Maria" },
+    { role: "user", content: "Yes, the AC stopped." },
+    { role: "user", content: "  " },
+  ],
+  call_analysis: { call_summary: "Needs AC repair.", user_sentiment: "Positive", custom_analysis_data: { outcome: "qualified", confidence: 0.86, urgency: "today_tomorrow" } },
+  call_cost: { combined_cost: 12.5 },
+  ...over,
+});
+
+describe("Retell call -> our call row", () => {
+  it("keeps the AI's outcome, answers, summary, transcript and cost", () => {
+    const r = callRowFromRetell(ended());
+    expect(r).toMatchObject({
+      status: "ended",
+      outcome: "qualified",
+      confidence: 0.86,
+      duration_seconds: 95,
+      summary: "Needs AC repair.",
+      sentiment: "Positive",
+      needs_review: false,
+      cost_usd: 0.125,
+      started_at: new Date(1_790_000_000_000).toISOString(),
+    });
+    expect(r.analysis).toMatchObject({ urgency: "today_tomorrow" });
+    expect(r.transcript).toEqual([
+      { role: "agent", content: "Hi Maria" },
+      { role: "user", content: "Yes, the AC stopped." },
+    ]);
+  });
+
+  it("uses how the call ended before what the AI said", () => {
+    expect(deriveOutcome(ended({ disconnection_reason: "dial_no_answer", call_status: "not_connected", call_analysis: undefined }))).toBe("no_answer");
+    expect(deriveOutcome(ended({ disconnection_reason: "voicemail_reached" }))).toBe("voicemail");
+    expect(deriveOutcome(ended({ disconnection_reason: "call_transfer" }))).toBe("transferred");
+    expect(deriveOutcome(ended({ disconnection_reason: "user_requested_dnc" }))).toBe("do_not_call");
+    expect(deriveOutcome(ended({ disconnection_reason: "invalid_destination", call_status: "error" }))).toBe("other");
+    expect(deriveOutcome(ended({ call_status: "ongoing" }))).toBeNull();
+    expect(deriveOutcome(ended({ call_analysis: { custom_analysis_data: { outcome: "made_up" } } }))).toBe("other");
+  });
+
+  it("flags unsure, unclear and emergency calls for review, never no-answers", () => {
+    expect(callRowFromRetell(ended({ call_analysis: { custom_analysis_data: { outcome: "qualified", confidence: 0.4 } } })).needs_review).toBe(true);
+    expect(callRowFromRetell(ended({ call_analysis: { custom_analysis_data: { outcome: "callback", confidence: 0.9, emergency: true } } })).needs_review).toBe(true);
+    expect(callRowFromRetell(ended({ call_analysis: { custom_analysis_data: {} } })).needs_review).toBe(true);
+    expect(callRowFromRetell(ended({ disconnection_reason: "dial_no_answer", call_status: "not_connected", call_analysis: {} })).needs_review).toBe(false);
+    // Before analysis arrives nothing is flagged yet.
+    expect(callRowFromRetell(ended({ call_analysis: undefined })).needs_review).toBe(false);
+  });
+
+  it("moves the customer forward only", () => {
+    expect(statusAfterCall("new", "qualified")).toBe("qualified");
+    expect(statusAfterCall("contacted", "qualified")).toBe("qualified");
+    expect(statusAfterCall("new", "callback")).toBe("contacted");
+    expect(statusAfterCall("new", "no_answer")).toBeNull();
+    expect(statusAfterCall("contacted", "not_interested")).toBeNull();
+    expect(statusAfterCall("appointment", "qualified")).toBeNull();
+    expect(statusAfterCall("won", "do_not_call")).toBeNull();
   });
 });
