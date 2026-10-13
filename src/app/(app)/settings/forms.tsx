@@ -4,7 +4,7 @@ import { useActionState, useRef } from "react";
 import { Alert, Button, Field, Input, Select } from "@/components/ui";
 import { useRestoreFields } from "@/components/use-restore-fields";
 import { US_TIMEZONES } from "@/lib/timezones";
-import { inviteMember, updateBusiness } from "./actions";
+import { inviteMember, setAutoCall, updateBusiness } from "./actions";
 
 export function BusinessForm({
   business,
@@ -75,6 +75,20 @@ export function InviteForm() {
           Invite
         </Button>
       </div>
+    </form>
+  );
+}
+
+export function AutoCallForm({ on, ready }: { on: boolean; ready: boolean }) {
+  const [state, action, pending] = useActionState(setAutoCall, undefined);
+  return (
+    <form action={action} className="space-y-3">
+      <input type="hidden" name="on" value={on ? "0" : "1"} />
+      {state?.error ? <Alert tone="error">{state.error}</Alert> : null}
+      {state?.message ? <Alert tone="success">{state.message}</Alert> : null}
+      <Button type="submit" variant={on ? "secondary" : "primary"} disabled={pending || !ready}>
+        {pending ? "Saving..." : on ? "Turn off automatic calls" : "Turn on automatic calls"}
+      </Button>
     </form>
   );
 }

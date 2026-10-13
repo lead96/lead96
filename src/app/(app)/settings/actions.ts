@@ -111,3 +111,16 @@ export async function revokeInvite(formData: FormData) {
   await supabase.from("workspace_invites").delete().eq("workspace_id", workspace.id).eq("id", inviteId);
   revalidatePath("/settings");
 }
+
+export type AutoCallState = { error?: string; message?: string } | undefined;
+
+/** Owner switch: let the AI call new form leads automatically. */
+export async function setAutoCall(_: AutoCallState, formData: FormData): Promise<AutoCallState> {
+  const workspace = await requireOwner();
+  const on = formData.get("on") === "1";
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("set_auto_call", { p_workspace: workspace.id, p_on: on });
+  if (error) return { error: error.code === "P0002" ? "The AI caller is not set up for this business yet." : "Could not save. Please try again." };
+  revalidatePath("/settings");
+  return { message: on ? "The AI now calls new leads automatically." : "Automatic calls are off." };
+}

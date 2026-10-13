@@ -125,6 +125,25 @@ export async function createWebCall(agentId: string, variables: Record<string, s
   });
 }
 
+/** An outbound phone call from one of our numbers. The idempotency key makes a retried request call only once. */
+export async function createPhoneCall(p: {
+  from: string;
+  to: string;
+  agentId: string;
+  variables: Record<string, string>;
+  metadata: Record<string, string>;
+  idempotencyKey: string;
+}) {
+  return retell<RetellCall>("POST", "/v2/create-phone-call", {
+    from_number: p.from,
+    to_number: p.to,
+    override_agent_id: p.agentId,
+    retell_llm_dynamic_variables: p.variables,
+    metadata: p.metadata,
+    idempotency_key: p.idempotencyKey.replace(/[^A-Za-z0-9_-]/g, "").slice(0, 255),
+  });
+}
+
 export async function getCall(callId: string) {
   return retell<RetellCall>("GET", `/v2/get-call/${encodeURIComponent(callId)}`);
 }

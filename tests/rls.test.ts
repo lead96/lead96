@@ -337,6 +337,26 @@ describe.skipIf(!configured)("row-level security", () => {
     await admin.from("phone_numbers").delete().eq("id", num.data!.id);
   }, 120_000);
 
+  it("call jobs: members read, nobody signed in can queue or claim calls", async () => {
+    const cust = await admin.from("customers").insert({ workspace_id: wsA, full_name: "Job Test", phone: `+1214555${String(Date.now()).slice(-4)}` }).select("id").single();
+    const job = await admin
+      .from("call_jobs")
+      .insert({ workspace_id: wsA, customer_id: cust.data!.id, trigger: "fast_callback", run_at: new Date(Date.now() + 86_400_000).toISOString() })
+      .select("id")
+      .single();
+    expect(job.error).toBeNull();
+    // One open job per customer: a second queued job for the same person is refused.
+    expect((await admin.from("call_jobs").insert({ workspace_id: wsA, customer_id: cust.data!.id, trigger: "retry", attempt: 2 })).error).not.toBeNull();
+
+    expect((await staffA.client.from("call_jobs").select("status").eq("id", job.data!.id)).data).toEqual([{ status: "queued" }]);
+    expect((await ownerB.client.from("call_jobs").select("id").eq("id", job.data!.id)).data).toEqual([]);
+    expect((await ownerA.client.from("call_jobs").insert({ workspace_id: wsA, customer_id: cust.data!.id, trigger: "manual" })).error).not.toBeNull();
+    expect((await ownerA.client.rpc("claim_call_jobs", { p_limit: 5 })).error).not.toBeNull();
+    expect((await ownerA.client.rpc("call_runner_tick")).error).not.toBeNull();
+
+    await admin.from("call_jobs").delete().eq("id", job.data!.id);
+  }, 120_000);
+
   it("ZIP lookup: readable by any signed-in user, not writable, and finds real ZIPs", async () => {
     const miami = await ownerA.client.rpc("zip_city_matches", { p_city: "miami", p_state: "FL" });
     expect(miami.data).toHaveLength(1);

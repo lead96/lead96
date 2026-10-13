@@ -1,9 +1,9 @@
 import type { Metadata } from "next";
-import { Card, PageHeader } from "@/components/ui";
+import { Badge, Card, PageHeader } from "@/components/ui";
 import { requireWorkspace } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { removeMember, revokeInvite } from "./actions";
-import { BusinessForm, InviteForm } from "./forms";
+import { AutoCallForm, BusinessForm, InviteForm } from "./forms";
 
 export const metadata: Metadata = { title: "Settings" };
 
@@ -12,7 +12,7 @@ export default async function SettingsPage() {
   const isOwner = workspace.role === "owner";
   const supabase = await createClient();
 
-  const [{ data: business }, { data: members }, { data: invites }] = await Promise.all([
+  const [{ data: business }, { data: members }, { data: invites }, { data: voice }, { data: numbers }] = await Promise.all([
     supabase.from("workspaces").select("name, timezone, phone, website").eq("id", workspace.id).single(),
     supabase
       .from("workspace_members")
@@ -27,7 +27,11 @@ export default async function SettingsPage() {
           .is("accepted_at", null)
           .order("created_at", { ascending: false })
       : Promise.resolve({ data: [] as { id: string; email: string; role: string; expires_at: string }[] }),
+    supabase.from("voice_agents").select("retell_agent_id, auto_call").eq("workspace_id", workspace.id).maybeSingle(),
+    supabase.from("phone_numbers").select("e164").eq("workspace_id", workspace.id),
   ]);
+  const aiReady = Boolean(voice?.retell_agent_id);
+  const aiNumber = numbers?.[0]?.e164.replace(/^\+1(\d{3})(\d{3})(\d{4})$/, "($1) $2-$3") ?? null;
 
   return (
     <>
@@ -37,6 +41,22 @@ export default async function SettingsPage() {
         <Card className="p-6">
           <h2 className="mb-4 font-semibold text-slate-900">Business</h2>
           {business ? <BusinessForm business={business} disabled={!isOwner} /> : null}
+        </Card>
+
+        <Card className="p-6">
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+            <h2 className="font-semibold text-slate-900">AI caller</h2>
+            {voice?.auto_call ? <Badge tone="green">Calling new leads</Badge> : <Badge>Automatic calls off</Badge>}
+          </div>
+          <ul className="mb-5 space-y-1.5 text-sm text-slate-600">
+            <li>AI caller: {aiReady ? <span className="font-medium text-slate-900">ready</span> : "being set up by Lead96"}</li>
+            <li>Calls from: {aiNumber ? <span className="font-medium tabular-nums text-slate-900">{aiNumber}</span> : "no number yet"}</li>
+          </ul>
+          <p className="mb-4 text-sm leading-relaxed text-slate-500">
+            When on, the AI calls each new form lead within a minute, between 8am and 8pm, and tries up to 3 times. It only calls people who agreed to AI
+            calls on the form, stays inside your service area, and never calls anyone who asked not to be called.
+          </p>
+          {isOwner ? <AutoCallForm on={Boolean(voice?.auto_call)} ready={aiReady} /> : <p className="text-xs text-slate-500">Only owners can change this.</p>}
         </Card>
 
         <Card className="p-6">

@@ -4,6 +4,7 @@ import { adGroupNames, getConnection } from "@/lib/google/ads";
 import { googleWebhookSchema, webhookToLead } from "@/lib/google/leads";
 import { logDelivery } from "@/lib/intake/deliveries";
 import { ingestLead } from "@/lib/leads/ingest";
+import { queueFastCallback } from "@/lib/voice/jobs";
 import { createAdminClient } from "@/lib/supabase/server";
 
 const MAX_BODY = 64 * 1024;
@@ -59,6 +60,7 @@ export async function POST(request: Request, ctx: RouteContext<"/api/intake/goog
     return permanent ? Response.json({ error: "no_contact" }, { status: 400 }) : Response.json({ error: "temporary_failure" }, { status: 500 });
   }
   log({ status: result.duplicate ? "duplicate" : "processed", leadId: result.leadId });
+  if (!result.duplicate) after(() => queueFastCallback(result.leadId));
 
   // The webhook carries only IDs; look up the campaign and ad group names afterwards.
   if (!result.duplicate && lead.adgroup_id) {

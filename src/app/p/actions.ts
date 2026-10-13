@@ -1,9 +1,11 @@
 "use server";
 
 import { headers } from "next/headers";
+import { after } from "next/server";
 import { CONSENT_VERSION, consentText, readContent, defaultContent, type TemplateKey } from "@/lib/landing/content";
 import { ingestLead } from "@/lib/leads/ingest";
 import { createAdminClient } from "@/lib/supabase/server";
+import { queueFastCallback } from "@/lib/voice/jobs";
 
 export type SubmitState = { ok?: boolean; error?: string; fields?: Record<string, string> } | undefined;
 
@@ -69,5 +71,7 @@ export async function submitLandingForm(_: SubmitState, data: FormData): Promise
     },
   });
   if (!result.ok) return { error: result.error, fields };
+  // Speed to lead: the AI calls back right away (when the business turned automatic calls on).
+  if (!result.duplicate) after(() => queueFastCallback(result.leadId));
   return { ok: true };
 }

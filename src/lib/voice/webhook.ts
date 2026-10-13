@@ -2,6 +2,7 @@ import "server-only";
 import { ingestLead } from "@/lib/leads/ingest";
 import { createAdminClient } from "@/lib/supabase/server";
 import { callMetadata, callRowFromRetell, OUTCOME_LABELS, statusAfterCall, type CallRowUpdate, type RetellCall } from "./calls";
+import { scheduleRetry } from "./jobs";
 
 type Db = ReturnType<typeof createAdminClient>;
 export type RetellEvent = { event: string; call: RetellCall };
@@ -92,7 +93,14 @@ export async function handleRetellEvent(e: RetellEvent): Promise<HandleResult> {
     callRowId = data.id;
   }
 
-  if (e.event === "call_analyzed") await afterAnalyzed(db, { workspaceId, callRowId, customerId, update, call });
+  // Calls that never connected get no analysis, so they are finished on call_ended.
+  const final = e.event === "call_analyzed" || (e.event === "call_ended" && call.call_status === "not_connected");
+  if (final) await afterAnalyzed(db, { workspaceId, callRowId, customerId, update, call });
+  if (e.event !== "call_started" && (update.outcome === "no_answer" || update.outcome === "voicemail")) {
+    const { data: c } = await db.from("calls").select("trigger, attempt, lead_id").eq("id", callRowId).single();
+    // One open job per customer (unique index), so call_ended + call_analyzed plan one retry.
+    if (c) await scheduleRetry(db, { workspace_id: workspaceId, customer_id: customerId, lead_id: c.lead_id, trigger: c.trigger, attempt: c.attempt, outcome: update.outcome });
+  }
   return { workspaceId, callRowId, status: "processed" };
 }
 
