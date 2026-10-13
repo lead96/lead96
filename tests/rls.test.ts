@@ -293,6 +293,50 @@ describe.skipIf(!configured)("row-level security", () => {
     expect((await ownerA.client.from("platform_connections").insert({ provider: "meta", secret_ciphertext: "x" })).error).not.toBeNull();
   });
 
+  it("voice: agents, numbers and calls are read by members, written by the server; owners switch auto-call", async () => {
+    expect((await admin.from("voice_agents").insert({ workspace_id: wsA, retell_agent_id: `agent_${run}`, version: 1 })).error).toBeNull();
+    const ver = await admin.from("voice_agent_versions").insert({ workspace_id: wsA, version: 1, config: { prompt: "x" } });
+    expect(ver.error).toBeNull();
+    const num = await admin.from("phone_numbers").insert({ workspace_id: wsA, e164: `+1555${String(Date.now()).slice(-7)}` }).select("id").single();
+    expect(num.error).toBeNull();
+    const call = await admin
+      .from("calls")
+      .insert({ workspace_id: wsA, direction: "outbound", trigger: "test", provider_call_id: `call_${run}`, status: "ended", outcome: "qualified" })
+      .select("id")
+      .single();
+    expect(call.error).toBeNull();
+
+    // Members read their own business's voice data; other businesses see nothing.
+    expect((await staffA.client.from("voice_agents").select("auto_call").eq("workspace_id", wsA)).data).toEqual([{ auto_call: false }]);
+    expect((await staffA.client.from("calls").select("outcome").eq("id", call.data!.id)).data).toEqual([{ outcome: "qualified" }]);
+    expect((await staffA.client.from("phone_numbers").select("id").eq("id", num.data!.id)).data).toHaveLength(1);
+    expect((await ownerB.client.from("calls").select("id").eq("id", call.data!.id)).data).toEqual([]);
+    expect((await ownerB.client.from("voice_agents").select("workspace_id").eq("workspace_id", wsA)).data).toEqual([]);
+    expect((await ownerB.client.from("phone_numbers").select("id").eq("id", num.data!.id)).data).toEqual([]);
+    // Prompt versions: owners only.
+    expect((await ownerA.client.from("voice_agent_versions").select("version").eq("workspace_id", wsA)).data).toEqual([{ version: 1 }]);
+    expect((await staffA.client.from("voice_agent_versions").select("version").eq("workspace_id", wsA)).data).toEqual([]);
+
+    // Nobody signed in can write calls, numbers or agents directly.
+    expect((await ownerA.client.from("calls").insert({ workspace_id: wsA, direction: "inbound", trigger: "inbound" })).error).not.toBeNull();
+    expect((await ownerA.client.from("phone_numbers").insert({ workspace_id: wsA, e164: "+15550000000" })).error).not.toBeNull();
+    await ownerA.client.from("voice_agents").update({ auto_call: true }).eq("workspace_id", wsA);
+    expect((await admin.from("voice_agents").select("auto_call").eq("workspace_id", wsA).single()).data!.auto_call).toBe(false);
+
+    // The owner switch goes through set_auto_call(): owners yes, staff and other businesses no.
+    expect((await staffA.client.rpc("set_auto_call", { p_workspace: wsA, p_on: true })).error).not.toBeNull();
+    expect((await ownerB.client.rpc("set_auto_call", { p_workspace: wsA, p_on: true })).error).not.toBeNull();
+    expect((await ownerA.client.rpc("set_auto_call", { p_workspace: wsA, p_on: true })).error).toBeNull();
+    expect((await admin.from("voice_agents").select("auto_call").eq("workspace_id", wsA).single()).data!.auto_call).toBe(true);
+
+    // Customers can be marked do-not-call only by the server.
+    const cust = await admin.from("customers").insert({ workspace_id: wsA, full_name: "DNC Test" }).select("id").single();
+    await ownerA.client.from("customers").update({ do_not_call: true }).eq("id", cust.data!.id);
+    expect((await admin.from("customers").select("do_not_call").eq("id", cust.data!.id).single()).data!.do_not_call).toBe(false);
+
+    await admin.from("phone_numbers").delete().eq("id", num.data!.id);
+  }, 120_000);
+
   it("ZIP lookup: readable by any signed-in user, not writable, and finds real ZIPs", async () => {
     const miami = await ownerA.client.rpc("zip_city_matches", { p_city: "miami", p_state: "FL" });
     expect(miami.data).toHaveLength(1);

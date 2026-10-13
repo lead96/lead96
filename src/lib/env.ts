@@ -29,6 +29,13 @@ const serverSchema = publicSchema.extend({
   /** Resend API key for app emails (invites). Auth emails go through Supabase SMTP instead. */
   RESEND_API_KEY: z.string().startsWith("re_").optional(),
   EMAIL_FROM: z.string().min(3).default("Lead96 <no-reply@lead96.com>"),
+  // AI voice: Lead96's Retell account (agents, numbers, calls). Webhooks are signed with this key.
+  RETELL_API_KEY: z.string().min(10).optional(),
+  RETELL_VOICE_ID: z.string().min(1).default("retell-Cimo"),
+  RETELL_LLM_MODEL: z.string().min(1).default("gpt-5.6-terra"),
+  // Twilio: SMS (no-answer texts) and US number registration.
+  TWILIO_ACCOUNT_SID: z.string().startsWith("AC").optional(),
+  TWILIO_AUTH_TOKEN: z.string().min(16).optional(),
   // Meta via the Lead96 Business Manager + System User token (agency model).
   META_APP_ID: z.string().min(1).optional(),
   META_APP_SECRET: z.string().min(1).optional(),
@@ -50,6 +57,11 @@ const OPTIONAL_KEYS = [
   "META_BUSINESS_ID",
   "RESEND_API_KEY",
   "EMAIL_FROM",
+  "RETELL_API_KEY",
+  "RETELL_VOICE_ID",
+  "RETELL_LLM_MODEL",
+  "TWILIO_ACCOUNT_SID",
+  "TWILIO_AUTH_TOKEN",
 ] as const;
 
 // NEXT_PUBLIC_* values must be referenced literally so Next can inline them in the browser bundle.

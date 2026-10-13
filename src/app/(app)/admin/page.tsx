@@ -72,7 +72,10 @@ export default async function AdminPage({ searchParams }: PageProps<"/admin">) {
         title="Admin"
         description="Integration health across all businesses."
         actions={
-          <div className="flex items-center gap-2 text-sm text-slate-500">
+          <div className="flex items-center gap-3 text-sm text-slate-500">
+            <Link href="/admin/voice" className="font-medium text-brand-700 hover:underline">
+              AI voice
+            </Link>
             <Badge tone={STATE[overall].tone}>{STATE[overall].label}</Badge>
             <span>Updated {formatDateTime(r.generated_at, TZ)} ET</span>
           </div>
