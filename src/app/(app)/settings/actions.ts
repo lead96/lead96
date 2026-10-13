@@ -2,7 +2,10 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { requireOwner } from "@/lib/auth";
+import { getProfile, requireOwner } from "@/lib/auth";
+import { sendEmail } from "@/lib/email/send";
+import { inviteEmail } from "@/lib/email/templates";
+import { publicEnv } from "@/lib/env";
 import { createClient } from "@/lib/supabase/server";
 import { US_TIMEZONES } from "@/lib/timezones";
 
@@ -67,15 +70,28 @@ export async function inviteMember(_: SettingsState, formData: FormData): Promis
       role: parsed.data.role,
       invited_by: user.user?.id,
     })
-    .select("token")
+    .select("id, token")
     .single();
   if (error || !data) return { error: "Could not create the invite.", fields };
 
   revalidatePath("/settings");
-  // Email delivery arrives with the email provider; until then the owner shares the link.
+  const inviteUrl = `${publicEnv().NEXT_PUBLIC_APP_URL.replace(/\/$/, "")}/invite/${data.token}`;
+  const profile = await getProfile();
+  const sent = await sendEmail(
+    {
+      to: parsed.data.email,
+      ...inviteEmail({ team: workspace.name, inviter: profile?.full_name || profile?.email || null, role: parsed.data.role, url: inviteUrl }),
+      replyTo: profile?.email ?? undefined,
+    },
+    `invite-${data.id}`,
+  );
+  if (!sent.ok) console.error("Invite email not sent:", sent.error);
+  // The link is always shown too, so the owner can share it another way.
   return {
-    message: `Invite created for ${parsed.data.email}. Share this link with them:`,
-    inviteUrl: `${process.env.NEXT_PUBLIC_APP_URL}/invite/${data.token}`,
+    message: sent.ok
+      ? `Invite sent to ${parsed.data.email}. You can also share this link:`
+      : `Invite created for ${parsed.data.email}, but the email could not be sent. Share this link with them:`,
+    inviteUrl,
   };
 }
 

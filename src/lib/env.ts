@@ -26,6 +26,9 @@ const serverSchema = publicSchema.extend({
   /** Manager (MCC) account ID; dashes are ignored. */
   GOOGLE_ADS_MANAGER_ID: z.string().min(1).optional(),
   GOOGLE_ADS_API_VERSION: z.string().regex(/^v\d+$/).default("v25"),
+  /** Resend API key for app emails (invites). Auth emails go through Supabase SMTP instead. */
+  RESEND_API_KEY: z.string().startsWith("re_").optional(),
+  EMAIL_FROM: z.string().min(3).default("Lead96 <no-reply@lead96.com>"),
   // Meta via the Lead96 Business Manager + System User token (agency model).
   META_APP_ID: z.string().min(1).optional(),
   META_APP_SECRET: z.string().min(1).optional(),
@@ -45,6 +48,8 @@ const OPTIONAL_KEYS = [
   "META_APP_SECRET",
   "META_SYSTEM_USER_TOKEN",
   "META_BUSINESS_ID",
+  "RESEND_API_KEY",
+  "EMAIL_FROM",
 ] as const;
 
 // NEXT_PUBLIC_* values must be referenced literally so Next can inline them in the browser bundle.

@@ -34,7 +34,9 @@ Supabase only allows custom templates once **custom SMTP** is configured (free t
 
 `{{ .SiteURL }}` in the templates is the project's Site URL, so it must be the app URL for that environment. `supabase/config.toml` points to the same files for local Supabase.
 
-Supabase's built-in email sender only delivers to the project's team members and a few emails per hour. Before real users sign up, configure custom SMTP (Resend) under Authentication -> SMTP.
+Production (set 2026-10-13): Supabase sends auth emails through Resend SMTP (`smtp.resend.com:465`, user `resend`, from `no-reply@lead96.com`), **Confirm email is ON**, Site URL `https://lead96.com`. The lead96.com DNS has Resend records on `send`, `rsend` and `resend._domainkey`; the root MX/SPF/DMARC records belong to Google Workspace (admin@lead96.com mail) and must stay.
+
+App emails (invites) go through the Resend API: `src/lib/email/send.ts` with `RESEND_API_KEY` (and optional `EMAIL_FROM`, default `Lead96 <no-reply@lead96.com>`). Addresses on reserved test domains (`.invalid`, `.test`, `example.com`, ...) are never emailed, so tests don't cause bounces. Test scripts should create users with the admin API (`email_confirm: true`) rather than the sign-up form, which now sends a confirmation email.
 
 ### Brand
 
@@ -76,7 +78,7 @@ Agency model: one Google user with access to the Lead96 manager account signs in
 
 ### Team invites
 
-Owners invite from **Settings**. Until the email provider is set up, the owner copies the invite link and sends it themselves; automatic invite emails come with Resend. The link opens `/invite/<token>`, which works signed in or out and explains wrong-account, expired, used and cancelled cases. Invites also appear on `/onboarding` for anyone signed in with the invited (verified) email.
+Owners invite from **Settings**. The invite is emailed (Resend) and the link is also shown, so the owner can share it another way if the email fails. The link opens `/invite/<token>`, which works signed in or out and explains wrong-account, expired, used and cancelled cases. Invites also appear on `/onboarding` for anyone signed in with the invited (verified) email.
 
 ## Scripts
 
