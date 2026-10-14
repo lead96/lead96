@@ -233,17 +233,29 @@ export async function buyNumber(opts: { areaCode?: number; nickname?: string }):
  * Points a number at a business's agent (or detaches it with agentId = null). Incoming calls ask
  * our inbound webhook first, so a known caller is greeted by name.
  */
-export async function bindNumber(e164: string, agentId: string | null, opts: { nickname?: string; smsAgentId?: string | null } = {}) {
+export async function bindNumber(
+  e164: string,
+  agentId: string | null,
+  opts: { nickname?: string; smsAgentId?: string | null } = {},
+): Promise<{ number: RetellNumber; smsLinked: boolean }> {
   const agents = agentId ? [{ agent_id: agentId, weight: 1 }] : [];
-  const sms = agentId && opts.smsAgentId ? [{ agent_id: opts.smsAgentId, weight: 1 }] : [];
-  return retell<RetellNumber>("PATCH", `/update-phone-number/${encodeURIComponent(e164)}`, {
+  const path = `/update-phone-number/${encodeURIComponent(e164)}`;
+  const voice = {
     inbound_agents: agents,
     outbound_agents: agents,
-    inbound_sms_agents: sms,
-    outbound_sms_agents: sms,
     inbound_webhook_url: agentId ? `${voiceWebhookBase()}/api/voice/inbound` : null,
     ...(opts.nickname !== undefined ? { nickname: opts.nickname.slice(0, 100) } : {}),
-  });
+  };
+  // Texting can only be linked once the number has US SMS registration (an "A2P application" in
+  // Retell); any SMS field before that fails the whole update. Calls are linked either way.
+  if (!agentId || !opts.smsAgentId) return { number: await retell<RetellNumber>("PATCH", path, voice), smsLinked: false };
+  const sms = [{ agent_id: opts.smsAgentId, weight: 1 }];
+  try {
+    return { number: await retell<RetellNumber>("PATCH", path, { ...voice, inbound_sms_agents: sms, outbound_sms_agents: sms }), smsLinked: true };
+  } catch (e) {
+    if (!(e instanceof RetellError) || !/a2p/i.test(e.message)) throw e;
+    return { number: await retell<RetellNumber>("PATCH", path, voice), smsLinked: false };
+  }
 }
 
 // ---------------------------------------------------------------------------

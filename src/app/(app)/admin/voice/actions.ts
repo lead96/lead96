@@ -86,15 +86,22 @@ export async function assignNumberAction(_: NumberState, formData: FormData): Pr
     .upsert({ e164, workspace_id: workspaceId, provider: "retell", nickname: name ?? null, created_by: profile.id }, { onConflict: "e164" });
   if (error) return { error: "Could not save." };
 
+  const agent = await agentOf(workspaceId);
+  let smsLinked = false;
   try {
-    const agent = await agentOf(workspaceId);
-    await bindNumber(e164, agent.voice, { nickname: name ?? "Lead96 (unassigned)", smsAgentId: agent.sms });
+    smsLinked = (await bindNumber(e164, agent.voice, { nickname: name ?? "Lead96 (unassigned)", smsAgentId: agent.sms })).smsLinked;
   } catch (e) {
     return { error: `Saved, but Retell was not updated: ${e instanceof Error ? e.message : "unknown error"}` };
   }
-  await audit(profile.id, workspaceId ? "voice.number_assigned" : "voice.number_unassigned", e164, {}, workspaceId);
+  await audit(profile.id, workspaceId ? "voice.number_assigned" : "voice.number_unassigned", e164, { sms_linked: smsLinked }, workspaceId);
   revalidatePath("/admin/voice");
-  return { message: workspaceId ? `Assigned to ${name}.` : "Not assigned." };
+  if (!workspaceId) return { message: "Not assigned." };
+  if (!agent.voice) return { message: `Assigned to ${name}. Create its AI caller below to connect the number.` };
+  return {
+    message: smsLinked
+      ? `Assigned to ${name}: calls and texts connected.`
+      : `Assigned to ${name}: calls connected. Texts start once US SMS registration is done for this number in Retell.`,
+  };
 }
 
 export type SyncAgentState = { error?: string; message?: string } | undefined;
