@@ -167,3 +167,24 @@ export async function scheduleRetry(db: Db, call: { workspace_id: string; custom
     .maybeSingle();
   return data?.id ?? null;
 }
+
+/** A team member asked the AI to call this customer now (same consent, area, DNC and hours rules). */
+export async function startManualCall(workspaceId: string, customerId: string): Promise<JobOutcome | { result: "busy"; reason: string }> {
+  const db = createAdminClient();
+  // Consent comes from the person's own leads: use the latest one that gave it, else the latest.
+  const { data: leads } = await db
+    .from("leads")
+    .select("id, consent_given")
+    .eq("customer_id", customerId)
+    .eq("workspace_id", workspaceId)
+    .order("received_at", { ascending: false })
+    .limit(20);
+  const lead = (leads ?? []).find((l) => l.consent_given) ?? leads?.[0] ?? null;
+  const { data: job, error } = await db
+    .from("call_jobs")
+    .insert({ workspace_id: workspaceId, customer_id: customerId, lead_id: lead?.id ?? null, trigger: "manual", status: "running" })
+    .select("id, workspace_id, customer_id, lead_id, trigger, attempt")
+    .single();
+  if (error || !job) return { result: "busy", reason: "A call to this customer is already planned or in progress." };
+  return runJob(db, job as Job);
+}

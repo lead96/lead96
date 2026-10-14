@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { buildAgentConfig, configHash, leadCallVariables, type AgentInput } from "@/lib/voice/agent-config";
 import { callRowFromRetell, deriveOutcome, statusAfterCall, type RetellCall } from "@/lib/voice/calls";
+import { callAnswers, outcomeLabel } from "@/lib/voice/present";
 import { signRetell, verifyRetell } from "@/lib/voice/signature";
 
 const input: AgentInput = {
@@ -155,5 +156,35 @@ describe("Retell call -> our call row", () => {
     expect(statusAfterCall("contacted", "not_interested")).toBeNull();
     expect(statusAfterCall("appointment", "qualified")).toBeNull();
     expect(statusAfterCall("won", "do_not_call")).toBeNull();
+  });
+});
+
+
+describe("call answers shown in the app", () => {
+  const questions = [
+    { key: "system_type", question: "What type of system is it?", answer_type: "choice", required: true },
+    { key: "custom_1", question: "Do you have pets?", answer_type: "text", required: false },
+  ];
+  it("labels answers with the business's questions, then the standard fields", () => {
+    const rows = callAnswers(
+      { outcome: "qualified", confidence: 0.9, answer_system_type: "Central air", answer_custom_1: "", service: "repair", urgency: "today_tomorrow", emergency: false, asked_for_human: true, preferred_window: "Monday morning" },
+      questions,
+      (v) => (v === "repair" ? "AC / Heating Repair" : v),
+    );
+    expect(rows).toEqual([
+      { label: "What type of system is it?", value: "Central air" },
+      { label: "Service", value: "AC / Heating Repair" },
+      { label: "Urgency", value: "Today or tomorrow" },
+      { label: "Preferred visit", value: "Monday morning" },
+      { label: "Asked for a person", value: "Yes" },
+    ]);
+  });
+  it("keeps answers to questions removed since the call, and hides unknowns", () => {
+    expect(callAnswers({ answer_roof_age: "10 years", service: "unknown" }, [], (v) => v)).toEqual([{ label: "roof age", value: "10 years" }]);
+  });
+  it("describes calls without an outcome yet", () => {
+    expect(outcomeLabel(null, "registered")).toBe("Calling...");
+    expect(outcomeLabel(null, "error")).toBe("Call failed");
+    expect(outcomeLabel("qualified", "ended")).toBe("Qualified");
   });
 });

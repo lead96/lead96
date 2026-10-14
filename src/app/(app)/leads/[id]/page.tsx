@@ -1,4 +1,5 @@
 import { ExternalLink } from "lucide-react";
+import Link from "next/link";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { Alert, Badge, Card, PageHeader } from "@/components/ui";
@@ -8,6 +9,10 @@ import { CALL_FIELD_KEYS, formatDuration } from "@/lib/intake/call";
 import { SOURCE_LABELS, STATUS_LABELS, STATUS_TONES, type CustomerStatus, type LeadSource } from "@/lib/leads/normalize";
 import { loadSetupContext } from "@/lib/setup/service";
 import { createClient } from "@/lib/supabase/server";
+import type { CallOutcome } from "@/lib/voice/agent-config";
+import { OUTCOME_LABELS } from "@/lib/voice/calls";
+import { OUTCOME_TONES, outcomeLabel, TRIGGER_LABELS } from "@/lib/voice/present";
+import { CallNowButton } from "../../calls/forms";
 import { NotesForm, StatusForm } from "./forms";
 
 export const metadata: Metadata = { title: "Customer" };
@@ -57,7 +62,7 @@ export default async function CustomerPage({ params }: PageProps<"/leads/[id]">)
   if (!UUID.test(id)) notFound();
   const supabase = await createClient();
 
-  const [{ data: customer }, { data: leadRows }, { data: eventRows }, ctx] = await Promise.all([
+  const [{ data: customer }, { data: leadRows }, { data: eventRows }, ctx, { data: callRows }, { data: voice }, { data: numbers }] = await Promise.all([
     supabase.from("customers").select("*").eq("id", id).eq("workspace_id", workspace.id).maybeSingle(),
     supabase.from("leads").select("*").eq("customer_id", id).order("received_at", { ascending: false }),
     supabase.from("events").select("id, type, subject_id, payload, actor_id, created_at").eq("customer_id", id)
@@ -66,6 +71,15 @@ export default async function CustomerPage({ params }: PageProps<"/leads/[id]">)
       .order("id", { ascending: false })
       .limit(200),
     loadSetupContext(supabase, workspace),
+    supabase
+      .from("calls")
+      .select("id, direction, trigger, status, outcome, needs_review, duration_seconds, summary, created_at")
+      .eq("customer_id", id)
+      .neq("trigger", "test")
+      .order("created_at", { ascending: false })
+      .limit(10),
+    supabase.from("voice_agents").select("retell_agent_id").eq("workspace_id", workspace.id).maybeSingle(),
+    supabase.from("phone_numbers").select("e164").eq("workspace_id", workspace.id).limit(1),
   ]);
   if (!customer) notFound();
   const leads = (leadRows ?? []) as Lead[];
@@ -91,6 +105,16 @@ export default async function CustomerPage({ params }: PageProps<"/leads/[id]">)
   const latest = leads[0];
   const title = customer.full_name || formatPhone(customer.phone) || customer.email;
   const tz = workspace.timezone;
+  const calls = (callRows ?? []) as { id: string; direction: string; trigger: string; status: string; outcome: CallOutcome | null; needs_review: boolean; duration_seconds: number | null; summary: string | null; created_at: string }[];
+  const callBlocked = customer.do_not_call
+    ? "This person asked not to be called."
+    : !voice?.retell_agent_id
+      ? "The AI caller is not set up yet."
+      : !numbers?.length
+        ? "No phone number for AI calls yet."
+        : !customer.phone
+          ? "No phone number for this customer."
+          : null;
 
   const describe = (e: Event): { title: string; detail?: string } => {
     const p = e.payload as Record<string, string | undefined>;
@@ -124,6 +148,23 @@ export default async function CustomerPage({ params }: PageProps<"/leads/[id]">)
         };
       case "customer.notes_updated":
         return { title: "Notes updated", detail: actorName(e.actor_id) ? `by ${actorName(e.actor_id)}` : undefined };
+      case "call.completed":
+        return {
+          title: `AI call - ${p.outcome ? (OUTCOME_LABELS[p.outcome as CallOutcome] ?? p.outcome) : "ended"}`,
+          detail: [p.direction === "inbound" ? "Incoming" : null, Number(p.duration_seconds) > 0 ? formatDuration(Number(p.duration_seconds)) : null, p.summary].filter(Boolean).join(" · "),
+        };
+      case "call.skipped":
+        return { title: "AI call not made", detail: p.reason };
+      case "call.failed":
+        // The provider's technical message stays on the call record (Admin); people see what it means.
+        return { title: "AI call failed", detail: p.reason?.startsWith("Retell") ? "The phone provider could not place the call." : p.reason };
+      case "call.reviewed":
+        return {
+          title: p.from !== p.to ? `Call outcome corrected to ${OUTCOME_LABELS[p.to as CallOutcome] ?? p.to}` : "Call reviewed",
+          detail: actorName(e.actor_id) ? `by ${actorName(e.actor_id)}` : undefined,
+        };
+      case "customer.do_not_call":
+        return { title: "Do not call", detail: p.reason };
       case "customer.possible_duplicate":
         return { title: "Possible duplicate", detail: "This phone and email belong to two different customers. Check before merging." };
       default:
@@ -154,10 +195,35 @@ export default async function CustomerPage({ params }: PageProps<"/leads/[id]">)
               <Row label="First source">{customer.first_source ? SOURCE_LABELS[customer.first_source as LeadSource] : "-"}</Row>
               <Row label="Leads">{customer.lead_count}</Row>
               <Row label="First contact">{customer.first_lead_at ? formatDateTime(customer.first_lead_at, tz) : "-"}</Row>
+              {customer.do_not_call ? <Row label="Calls"><Badge tone="amber">Do not call</Badge></Row> : null}
             </dl>
             <div className="mt-5 border-t border-slate-100 pt-4">
               <StatusForm customerId={customer.id} status={customer.status as CustomerStatus} />
             </div>
+          </Card>
+
+          <Card className="p-6">
+            <h2 className="mb-3 font-semibold text-slate-900">AI calls</h2>
+            {calls.length ? (
+              <ul className="mb-4 divide-y divide-slate-100">
+                {calls.map((c) => (
+                  <li key={c.id} className="py-2.5 first:pt-0">
+                    <Link href={`/calls/${c.id}`} className="group block">
+                      <span className="flex flex-wrap items-center gap-1.5">
+                        <Badge tone={c.outcome ? OUTCOME_TONES[c.outcome] : c.status === "error" ? "red" : "slate"}>{outcomeLabel(c.outcome, c.status)}</Badge>
+                        {c.needs_review ? <Badge tone="amber">Needs review</Badge> : null}
+                      </span>
+                      <span className="mt-1 block text-xs text-slate-500 group-hover:text-brand-700">
+                        {[formatDateTime(c.created_at, tz), TRIGGER_LABELS[c.trigger] ?? c.trigger, c.duration_seconds ? formatDuration(c.duration_seconds) : null].filter(Boolean).join(" · ")}
+                      </span>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="mb-4 text-sm text-slate-500">No AI calls with this customer yet.</p>
+            )}
+            <CallNowButton customerId={customer.id} blocked={callBlocked} />
           </Card>
 
           <Card className="p-6">

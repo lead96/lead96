@@ -329,6 +329,17 @@ describe.skipIf(!configured)("row-level security", () => {
     expect((await ownerA.client.rpc("set_auto_call", { p_workspace: wsA, p_on: true })).error).toBeNull();
     expect((await admin.from("voice_agents").select("auto_call").eq("workspace_id", wsA).single()).data!.auto_call).toBe(true);
 
+    // Review: any member (staff too) marks a call reviewed / corrects the outcome; other businesses cannot.
+    await admin.from("calls").update({ needs_review: true }).eq("id", call.data!.id);
+    expect((await ownerB.client.rpc("review_call", { p_call: call.data!.id, p_outcome: "booked" })).error).not.toBeNull();
+    expect((await staffA.client.rpc("review_call", { p_call: call.data!.id, p_outcome: "made_up" })).error).not.toBeNull();
+    expect((await staffA.client.rpc("review_call", { p_call: call.data!.id, p_outcome: "booked" })).error).toBeNull();
+    const reviewed = (await admin.from("calls").select("outcome, original_outcome, needs_review, reviewed_by").eq("id", call.data!.id).single()).data!;
+    expect(reviewed).toEqual({ outcome: "booked", original_outcome: "qualified", needs_review: false, reviewed_by: staffA.id });
+    // Direct edits stay impossible.
+    await ownerA.client.from("calls").update({ outcome: "other" }).eq("id", call.data!.id);
+    expect((await admin.from("calls").select("outcome").eq("id", call.data!.id).single()).data!.outcome).toBe("booked");
+
     // Customers can be marked do-not-call only by the server.
     const cust = await admin.from("customers").insert({ workspace_id: wsA, full_name: "DNC Test" }).select("id").single();
     await ownerA.client.from("customers").update({ do_not_call: true }).eq("id", cust.data!.id);

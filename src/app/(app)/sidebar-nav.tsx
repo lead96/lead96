@@ -18,8 +18,7 @@ import {
   Upload,
   UserPlus,
   Users,
-  type LucideIcon,
-} from "lucide-react";
+  type LucideIcon, PhoneCall } from "lucide-react";
 import { cx } from "@/components/ui";
 import { useDismiss } from "@/components/use-dismiss";
 
@@ -45,6 +44,7 @@ export function SidebarContent({ showSetup, isAdmin, isOwner, workspaceName, rol
         ...(showSetup ? [{ href: "/setup", label: "Setup assistant", icon: ListChecks, badge: "To do" }] : []),
         { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
         { href: "/leads", label: "Leads", icon: Users },
+        { href: "/calls", label: "Calls", icon: PhoneCall },
         { href: "/landing-pages", label: "Landing pages", icon: PanelsTopLeft },
         { href: "/calendar", label: "Calendar", icon: CalendarDays },
       ],
