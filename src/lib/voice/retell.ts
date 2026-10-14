@@ -2,6 +2,7 @@ import "server-only";
 import { publicEnv, serverEnv } from "@/lib/env";
 import type { VoiceAgentConfig } from "./agent-config";
 import type { RetellCall } from "./calls";
+import type { SmsAgentConfig } from "./sms-config";
 
 /** Lead96's Retell account (agency model): agents, phone numbers and calls for every business. */
 const BASE = "https://api.retellai.com";
@@ -232,12 +233,74 @@ export async function buyNumber(opts: { areaCode?: number; nickname?: string }):
  * Points a number at a business's agent (or detaches it with agentId = null). Incoming calls ask
  * our inbound webhook first, so a known caller is greeted by name.
  */
-export async function bindNumber(e164: string, agentId: string | null, opts: { nickname?: string } = {}) {
+export async function bindNumber(e164: string, agentId: string | null, opts: { nickname?: string; smsAgentId?: string | null } = {}) {
   const agents = agentId ? [{ agent_id: agentId, weight: 1 }] : [];
+  const sms = agentId && opts.smsAgentId ? [{ agent_id: opts.smsAgentId, weight: 1 }] : [];
   return retell<RetellNumber>("PATCH", `/update-phone-number/${encodeURIComponent(e164)}`, {
     inbound_agents: agents,
     outbound_agents: agents,
+    inbound_sms_agents: sms,
+    outbound_sms_agents: sms,
     inbound_webhook_url: agentId ? `${voiceWebhookBase()}/api/voice/inbound` : null,
     ...(opts.nickname !== undefined ? { nickname: opts.nickname.slice(0, 100) } : {}),
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Texts (Retell SMS chat agent per business)
+// ---------------------------------------------------------------------------
+
+export type RetellChat = {
+  chat_id: string;
+  agent_id?: string;
+  chat_status: "ongoing" | "ended" | "error";
+  chat_type?: string;
+  metadata?: unknown;
+  start_timestamp?: number;
+  end_timestamp?: number | null;
+  message_with_tool_calls?: { role: string; content?: string }[];
+  transcript?: string;
+  chat_analysis?: { chat_summary?: string; user_sentiment?: string; chat_successful?: boolean; custom_analysis_data?: unknown };
+};
+
+/** Creates the business's text LLM and chat agent, or updates them in place. */
+export async function upsertSmsAgent(c: SmsAgentConfig, existing: Partial<AgentIds>, base: string): Promise<AgentIds> {
+  const llmBody = {
+    model: serverEnv().RETELL_LLM_MODEL,
+    model_temperature: 0.2,
+    start_speaker: "agent",
+    general_prompt: c.prompt,
+    begin_message: c.beginMessage,
+    default_dynamic_variables: c.dynamicDefaults,
+    general_tools: [{ type: "end_call", name: "end_chat", description: "End the conversation when it is finished or they asked to stop." }],
+  };
+  const llm = existing.llmId
+    ? await retell<{ llm_id: string }>("PATCH", `/update-retell-llm/${existing.llmId}`, llmBody)
+    : await retell<{ llm_id: string }>("POST", "/create-retell-llm", llmBody);
+  const agentBody = {
+    agent_name: c.agentName,
+    response_engine: { type: "retell-llm", llm_id: llm.llm_id },
+    language: "en-US",
+    webhook_url: `${base}/api/voice/retell`,
+    webhook_events: ["chat_started", "chat_ended", "chat_analyzed"],
+    post_chat_analysis_data: c.analysis,
+    end_chat_after_silence_ms: 24 * 3_600_000,
+    data_storage_setting: "everything",
+  };
+  const agent = existing.agentId
+    ? await retell<{ agent_id: string }>("PATCH", `/update-chat-agent/${existing.agentId}`, agentBody)
+    : await retell<{ agent_id: string }>("POST", "/create-chat-agent", agentBody);
+  return { llmId: llm.llm_id, agentId: agent.agent_id };
+}
+
+/** Starts a text conversation; the first text is the {{sms_opening}} we pass. */
+export async function createSmsChat(p: { from: string; to: string; agentId: string; variables: Record<string, string>; metadata: Record<string, string> }) {
+  return retell<RetellChat>("POST", "/create-sms-chat", {
+    from_number: p.from,
+    to_number: p.to,
+    override_agent_id: p.agentId,
+    retell_llm_dynamic_variables: p.variables,
+    metadata: p.metadata,
+    honor_internal_dnc: true,
   });
 }

@@ -19,9 +19,9 @@ async function audit(actorId: string, action: string, target: string, metadata: 
 
 /** The business's Retell agent, if it has one yet (numbers are bound to it once it exists). */
 async function agentOf(workspaceId: string | null) {
-  if (!workspaceId) return null;
-  const { data } = await createAdminClient().from("voice_agents").select("retell_agent_id").eq("workspace_id", workspaceId).maybeSingle();
-  return data?.retell_agent_id ?? null;
+  if (!workspaceId) return { voice: null, sms: null };
+  const { data } = await createAdminClient().from("voice_agents").select("retell_agent_id, retell_chat_agent_id").eq("workspace_id", workspaceId).maybeSingle();
+  return { voice: data?.retell_agent_id ?? null, sms: data?.retell_chat_agent_id ?? null };
 }
 
 export type NumberState = { error?: string; message?: string } | undefined;
@@ -64,8 +64,8 @@ export async function buyNumberAction(_: NumberState, formData: FormData): Promi
   // The number is bought either way; a failed insert only means the list below must be refreshed.
   await audit(profile.id, "voice.number_bought", bought.phone_number, { area_code: areaRaw || null, saved: !error }, workspaceId);
 
-  const agentId = await agentOf(workspaceId);
-  if (agentId) await bindNumber(bought.phone_number, agentId).catch(() => null);
+  const agent = await agentOf(workspaceId);
+  if (agent.voice) await bindNumber(bought.phone_number, agent.voice, { smsAgentId: agent.sms }).catch(() => null);
 
   revalidatePath("/admin/voice");
   return { message: `Bought ${bought.phone_number_pretty ?? bought.phone_number}${businessName ? ` for ${businessName}` : ""}.` };
@@ -87,7 +87,8 @@ export async function assignNumberAction(_: NumberState, formData: FormData): Pr
   if (error) return { error: "Could not save." };
 
   try {
-    await bindNumber(e164, await agentOf(workspaceId), { nickname: name ?? "Lead96 (unassigned)" });
+    const agent = await agentOf(workspaceId);
+    await bindNumber(e164, agent.voice, { nickname: name ?? "Lead96 (unassigned)", smsAgentId: agent.sms });
   } catch (e) {
     return { error: `Saved, but Retell was not updated: ${e instanceof Error ? e.message : "unknown error"}` };
   }

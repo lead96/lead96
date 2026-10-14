@@ -3,6 +3,7 @@ import { ingestLead } from "@/lib/leads/ingest";
 import { createAdminClient } from "@/lib/supabase/server";
 import { callMetadata, callRowFromRetell, OUTCOME_LABELS, statusAfterCall, withBooking, type CallRowUpdate, type RetellCall } from "./calls";
 import { scheduleRetry } from "./jobs";
+import { sendNoAnswerText } from "./texts";
 
 type Db = ReturnType<typeof createAdminClient>;
 export type RetellEvent = { event: string; call: RetellCall };
@@ -102,6 +103,8 @@ export async function handleRetellEvent(e: RetellEvent): Promise<HandleResult> {
     const { data: c } = await db.from("calls").select("trigger, attempt, lead_id").eq("id", callRowId).single();
     // One open job per customer (unique index), so call_ended + call_analyzed plan one retry.
     if (c) await scheduleRetry(db, { workspace_id: workspaceId, customer_id: customerId, lead_id: c.lead_id, trigger: c.trigger, attempt: c.attempt, outcome: update.outcome });
+    // The first automatic call went unanswered: text them so they can reply instead (once per call).
+    if (c?.trigger === "fast_callback" && c.attempt === 1) await sendNoAnswerText(db, { id: callRowId, workspace_id: workspaceId, customer_id: customerId, lead_id: c.lead_id });
   }
   return { workspaceId, callRowId, status: "processed" };
 }

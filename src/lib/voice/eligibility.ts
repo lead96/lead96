@@ -88,3 +88,29 @@ export function retryTime(attempt: number, now: Date): Date | null {
   const delay = RETRY_DELAYS_MIN[attempt - 1] ?? RETRY_DELAYS_MIN.at(-1)!;
   return new Date(now.getTime() + delay * 60_000);
 }
+
+export const TEXT_EVERY_HOURS = 24;
+
+export type TextInput = {
+  now: Date;
+  timezone: string;
+  smsReady: boolean;
+  fromNumber: string | null;
+  lead: { source: string; consent_given: boolean } | null;
+  customer: { do_not_call: boolean; phone: string | null };
+  /** Latest text conversation we started with this person. */
+  lastTextAt: Date | null;
+};
+
+/** May we text this person now? Same consent and do-not-contact rules as calls; no deferral (skip). */
+export function decideText(i: TextInput): { ok: true; toNumber: string } | { ok: false; reason: string } {
+  if (!i.smsReady) return { ok: false, reason: "The text agent is not set up yet." };
+  if (!i.fromNumber) return { ok: false, reason: "The business has no phone number for texts yet." };
+  if (i.customer.do_not_call) return { ok: false, reason: "Asked not to be contacted." };
+  if (!i.lead?.consent_given) return { ok: false, reason: "No consent to texts on this lead." };
+  const to = i.customer.phone;
+  if (!to || !/^\+1[2-9]\d{9}$/.test(to)) return { ok: false, reason: "No US phone number." };
+  if (i.lastTextAt && i.now.getTime() - i.lastTextAt.getTime() < TEXT_EVERY_HOURS * 3_600_000) return { ok: false, reason: "Already texted recently." };
+  if (!inCallWindow(i.now, i.timezone)) return { ok: false, reason: "Outside texting hours." };
+  return { ok: true, toNumber: to };
+}

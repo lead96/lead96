@@ -368,6 +368,16 @@ describe.skipIf(!configured)("row-level security", () => {
     await admin.from("call_jobs").delete().eq("id", job.data!.id);
   }, 120_000);
 
+  it("text messages: members read, nobody signed in writes", async () => {
+    const msg = await admin.from("messages").insert({ workspace_id: wsA, reason: "no_answer", status: "sent", body: "Hi" }).select("id").single();
+    expect(msg.error).toBeNull();
+    expect((await staffA.client.from("messages").select("body").eq("id", msg.data!.id)).data).toEqual([{ body: "Hi" }]);
+    expect((await ownerB.client.from("messages").select("id").eq("id", msg.data!.id)).data).toEqual([]);
+    expect((await ownerA.client.from("messages").insert({ workspace_id: wsA, reason: "manual" })).error).not.toBeNull();
+    await ownerA.client.from("messages").update({ body: "changed" }).eq("id", msg.data!.id);
+    expect((await admin.from("messages").select("body").eq("id", msg.data!.id).single()).data!.body).toBe("Hi");
+  }, 120_000);
+
   it("ZIP lookup: readable by any signed-in user, not writable, and finds real ZIPs", async () => {
     const miami = await ownerA.client.rpc("zip_city_matches", { p_city: "miami", p_state: "FL" });
     expect(miami.data).toHaveLength(1);

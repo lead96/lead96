@@ -163,6 +163,12 @@ export default async function CustomerPage({ params }: PageProps<"/leads/[id]">)
           title: p.from !== p.to ? `Call outcome corrected to ${OUTCOME_LABELS[p.to as CallOutcome] ?? p.to}` : "Call reviewed",
           detail: actorName(e.actor_id) ? `by ${actorName(e.actor_id)}` : undefined,
         };
+      case "sms.sent":
+        return { title: "Text sent after a missed call", detail: p.body };
+      case "sms.replied":
+        return { title: "Replied by text", detail: [p.summary, p.preferred_window ? `Preferred: ${p.preferred_window}` : null].filter(Boolean).join(" · ") };
+      case "sms.failed":
+        return { title: "Text not sent", detail: p.reason?.startsWith("Retell") ? "The phone provider could not send the text." : p.reason };
       case "appointment.requested":
         return { title: `Visit requested: ${p.label}`, detail: [p.address, p.notes, "chosen on an AI call, team to confirm"].filter(Boolean).join(" · ") };
       case "customer.do_not_call":

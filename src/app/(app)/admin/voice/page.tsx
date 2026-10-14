@@ -19,7 +19,7 @@ export default async function VoiceAdminPage() {
   const [{ data: businesses }, { data: assigned }, { data: agents }] = await Promise.all([
     db.from("workspaces").select("id, name, setup_completed_at").order("name"),
     db.from("phone_numbers").select("e164, workspace_id"),
-    db.from("voice_agents").select("workspace_id, retell_agent_id, version, synced_at, last_error, last_error_at, auto_call"),
+    db.from("voice_agents").select("workspace_id, retell_agent_id, retell_chat_agent_id, version, synced_at, last_error, last_error_at, auto_call"),
   ]);
   const agentOf = new Map((agents ?? []).map((a) => [a.workspace_id, a]));
   const assignedTo = new Map((assigned ?? []).map((a) => [a.e164, a.workspace_id as string | null]));
@@ -92,6 +92,7 @@ export default async function VoiceAdminPage() {
                         <div className="mt-1.5 flex flex-wrap gap-1.5">
                           {a?.retell_agent_id ? <Badge tone="green">AI caller v{a.version}</Badge> : <Badge>No AI caller</Badge>}
                           {!b.setup_completed_at ? <Badge tone="amber">Setup not finished</Badge> : null}
+                          {a?.retell_chat_agent_id ? <Badge tone="green">Texts</Badge> : null}
                           {a?.auto_call ? <Badge tone="blue">Calls new leads</Badge> : null}
                           {numbersOf.length ? <Badge>{numbersOf.join(", ")}</Badge> : <Badge>No number</Badge>}
                         </div>

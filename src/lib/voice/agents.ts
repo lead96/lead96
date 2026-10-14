@@ -2,7 +2,8 @@ import "server-only";
 import { createAdminClient } from "@/lib/supabase/server";
 import { buildAgentConfig, configHash, VOICE_PROMPT_VERSION, type VoiceAgentConfig } from "./agent-config";
 import { loadAgentInput } from "./input";
-import { bindNumber, RetellError, upsertAgent, voiceWebhookBase } from "./retell";
+import { bindNumber, RetellError, upsertAgent, upsertSmsAgent, voiceWebhookBase } from "./retell";
+import { buildSmsConfig } from "./sms-config";
 
 export { voiceWebhookBase };
 export type SyncResult = { status: "created" | "updated" | "unchanged"; version: number; agentId: string } | { status: "error"; error: string };
@@ -13,13 +14,15 @@ export type SyncResult = { status: "created" | "updated" | "unchanged"; version:
  */
 export async function syncVoiceAgent(workspaceId: string, actorId: string | null, opts: { force?: boolean } = {}): Promise<SyncResult> {
   const db = createAdminClient();
-  const config = buildAgentConfig(await loadAgentInput(workspaceId));
+  const input = await loadAgentInput(workspaceId);
+  const config = buildAgentConfig(input);
+  const sms = buildSmsConfig(input);
   const webhookUrl = `${voiceWebhookBase()}/api/voice/retell`;
-  const hash = configHash(config, { webhookUrl });
+  const hash = configHash(config, { webhookUrl, sms });
 
   const { data: current } = await db
     .from("voice_agents")
-    .select("retell_agent_id, retell_llm_id, version, config_hash")
+    .select("retell_agent_id, retell_llm_id, retell_chat_agent_id, retell_sms_llm_id, version, config_hash")
     .eq("workspace_id", workspaceId)
     .maybeSingle();
   if (current?.retell_agent_id && current.config_hash === hash && !opts.force) {
@@ -27,8 +30,10 @@ export async function syncVoiceAgent(workspaceId: string, actorId: string | null
   }
 
   let ids;
+  let smsIds;
   try {
     ids = await upsertAgent(config, { llmId: current?.retell_llm_id ?? undefined, agentId: current?.retell_agent_id ?? undefined }, voiceWebhookBase());
+    smsIds = await upsertSmsAgent(sms, { llmId: current?.retell_sms_llm_id ?? undefined, agentId: current?.retell_chat_agent_id ?? undefined }, voiceWebhookBase());
   } catch (e) {
     const error = e instanceof RetellError ? e.message : e instanceof Error ? e.message : "Could not reach Retell.";
     await db
@@ -38,12 +43,14 @@ export async function syncVoiceAgent(workspaceId: string, actorId: string | null
   }
 
   const version = (current?.version ?? 0) + 1;
-  await db.from("voice_agent_versions").insert({ workspace_id: workspaceId, version, config: config as unknown as Record<string, unknown>, created_by: actorId });
+  await db.from("voice_agent_versions").insert({ workspace_id: workspaceId, version, config: { ...config, sms } as unknown as Record<string, unknown>, created_by: actorId });
   await db.from("voice_agents").upsert(
     {
       workspace_id: workspaceId,
       retell_agent_id: ids.agentId,
       retell_llm_id: ids.llmId,
+      retell_chat_agent_id: smsIds.agentId,
+      retell_sms_llm_id: smsIds.llmId,
       version,
       config_hash: hash,
       synced_at: new Date().toISOString(),
@@ -56,7 +63,7 @@ export async function syncVoiceAgent(workspaceId: string, actorId: string | null
 
   // Numbers already assigned to the business now answer with this agent.
   const { data: numbers } = await db.from("phone_numbers").select("e164").eq("workspace_id", workspaceId);
-  for (const n of numbers ?? []) await bindNumber(n.e164, ids.agentId).catch(() => null);
+  for (const n of numbers ?? []) await bindNumber(n.e164, ids.agentId, { smsAgentId: smsIds.agentId }).catch(() => null);
 
   return { status: current?.retell_agent_id ? "updated" : "created", version, agentId: ids.agentId };
 }
