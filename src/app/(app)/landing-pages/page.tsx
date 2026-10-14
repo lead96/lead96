@@ -1,13 +1,14 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import { ClipboardList, FileText, PanelsTopLeft, Phone, Tag } from "lucide-react";
-import { Badge, Button, Card, EmptyState, IconTile, PageHeader, Section, type Icon } from "@/components/ui";
+import { Badge, Card, EmptyState, IconTile, PageHeader, Section, type Icon } from "@/components/ui";
 import { requireWorkspace } from "@/lib/auth";
 import { publicEnv } from "@/lib/env";
 import { timeAgo } from "@/lib/format";
 import { TEMPLATES } from "@/lib/landing/content";
 import { createClient } from "@/lib/supabase/server";
 import { createLandingPage } from "./actions";
+import { UseTemplateButton } from "./use-template-button";
 
 export const metadata: Metadata = { title: "Landing pages" };
 
@@ -112,9 +113,7 @@ export default async function LandingPagesPage() {
                 <p className="mt-3 flex-1 text-[13px] leading-relaxed text-slate-500">{t.description}</p>
                 <form action={createLandingPage} className="mt-4">
                   <input type="hidden" name="template" value={t.value} />
-                  <Button type="submit" variant="secondary" size="sm">
-                    Use template
-                  </Button>
+                  <UseTemplateButton />
                 </form>
               </Card>
             ))}
