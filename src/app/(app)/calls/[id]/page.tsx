@@ -34,7 +34,7 @@ export default async function CallPage({ params }: PageProps<"/calls/[id]">) {
   ]);
 
   const tz = workspace.timezone;
-  const who = customer?.full_name || formatPhone(customer?.phone ?? (call.direction === "inbound" ? call.from_number : call.to_number)) || "Unknown caller";
+  const who = customer?.full_name || formatPhone(customer?.phone ?? (call.direction === "inbound" ? call.from_number : call.to_number)) || (call.trigger === "test" ? "browser test" : "Unknown caller");
   const serviceLabel = (v: string) => ctx.services.find((s) => s.value === v)?.label ?? v;
   const answers = callAnswers((call.analysis ?? {}) as Record<string, unknown>, ((agent?.questions ?? []) as AgentQuestion[]).filter((q) => q?.question), serviceLabel);
   const transcript = (call.transcript ?? []) as { role: "agent" | "user"; content: string }[];

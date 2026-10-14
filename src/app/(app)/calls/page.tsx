@@ -29,27 +29,30 @@ export default async function CallsPage({ searchParams }: PageProps<"/calls">) {
   const workspace = await requireWorkspace();
   const sp = await searchParams;
   const review = sp.view === "review";
+  const tests = sp.view === "tests";
   const supabase = await createClient();
 
   let q = supabase
     .from("calls")
     .select("id, direction, trigger, status, outcome, needs_review, duration_seconds, summary, created_at, customer_id, customers (full_name, phone)")
     .eq("workspace_id", workspace.id)
-    .neq("trigger", "test")
     .order("created_at", { ascending: false })
     .limit(100);
-  if (review) q = q.eq("needs_review", true);
+  // Browser test calls (Admin -> AI voice) are listed too, marked "Test"; the Test calls tab shows only them.
+  if (review) q = q.eq("needs_review", true).neq("trigger", "test");
+  if (tests) q = q.eq("trigger", "test");
   const [{ data }, { count: reviewCount }, { data: voice }] = await Promise.all([
     q,
-    supabase.from("calls").select("id", { count: "exact", head: true }).eq("workspace_id", workspace.id).eq("needs_review", true),
+    supabase.from("calls").select("id", { count: "exact", head: true }).eq("workspace_id", workspace.id).eq("needs_review", true).neq("trigger", "test"),
     supabase.from("voice_agents").select("auto_call").eq("workspace_id", workspace.id).maybeSingle(),
   ]);
   const calls = (data ?? []) as unknown as Row[];
   const tz = workspace.timezone;
 
   const tabs = [
-    { href: "/calls", label: "All calls", active: !review },
+    { href: "/calls", label: "All calls", active: !review && !tests },
     { href: "/calls?view=review", label: `Needs review${reviewCount ? ` (${reviewCount})` : ""}`, active: review },
+    { href: "/calls?view=tests", label: "Test calls", active: tests },
   ];
 
   return (
@@ -74,10 +77,12 @@ export default async function CallsPage({ searchParams }: PageProps<"/calls">) {
         <Card>
           <EmptyState
             icon={PhoneCall}
-            title={review ? "Nothing to review" : "No AI calls yet"}
+            title={review ? "Nothing to review" : tests ? "No test calls yet" : "No AI calls yet"}
             description={
               review
                 ? "Calls the AI was unsure about, emergencies and unclear results show up here."
+                : tests
+                  ? "Browser test calls from Admin > AI voice show up here."
                 : voice?.auto_call
                   ? "The AI calls new form leads automatically. Calls appear here as they happen."
                   : "Turn on automatic calls in Settings, or start a call from a customer's page."
@@ -89,7 +94,7 @@ export default async function CallsPage({ searchParams }: PageProps<"/calls">) {
         <Card className="overflow-hidden">
           <ul className="divide-y divide-slate-100">
             {calls.map((c) => {
-              const who = c.customers?.full_name || formatPhone(c.customers?.phone ?? null) || "Unknown caller";
+              const who = c.customers?.full_name || formatPhone(c.customers?.phone ?? null) || (c.trigger === "test" ? "Browser test call" : "Unknown caller");
               const Icon = c.direction === "inbound" ? PhoneIncoming : PhoneOutgoing;
               return (
                 <li key={c.id}>
@@ -102,6 +107,7 @@ export default async function CallsPage({ searchParams }: PageProps<"/calls">) {
                         <span className="font-medium text-slate-900">{who}</span>
                         <Badge tone={c.outcome ? OUTCOME_TONES[c.outcome] : c.status === "error" ? "red" : "slate"}>{outcomeLabel(c.outcome, c.status)}</Badge>
                         {c.needs_review ? <Badge tone="amber">Needs review</Badge> : null}
+                        {c.trigger === "test" ? <Badge>Test</Badge> : null}
                       </span>
                       {c.summary ? <span className="mt-1 line-clamp-2 block text-sm text-slate-600">{c.summary}</span> : null}
                       <span className="mt-1 block text-xs text-slate-500">
