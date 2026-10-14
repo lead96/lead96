@@ -16,11 +16,19 @@ export default async function VoiceAdminPage() {
   if (!profile?.is_platform_admin) redirect("/dashboard");
 
   const db = createAdminClient();
-  const [{ data: businesses }, { data: assigned }, { data: agents }] = await Promise.all([
+  const [{ data: businesses }, { data: assigned }, { data: agents }, { data: owners }] = await Promise.all([
     db.from("workspaces").select("id, name, setup_completed_at").order("name"),
     db.from("phone_numbers").select("e164, workspace_id"),
     db.from("voice_agents").select("workspace_id, retell_agent_id, retell_chat_agent_id, version, synced_at, last_error, last_error_at, auto_call"),
+    db.from("workspace_members").select("workspace_id, created_at, profiles (email)").eq("role", "owner").order("created_at"),
   ]);
+  // Several businesses can share a name: the owner email tells them apart.
+  const ownerOf = new Map<string, string>();
+  for (const o of (owners ?? []) as unknown as { workspace_id: string; profiles: { email: string | null } | null }[]) {
+    const email = o.profiles?.email;
+    if (email) ownerOf.set(o.workspace_id, ownerOf.has(o.workspace_id) ? `${ownerOf.get(o.workspace_id)}, ${email}` : email);
+  }
+  const options = (businesses ?? []).map((b) => ({ id: b.id, name: ownerOf.has(b.id) ? `${b.name} (${ownerOf.get(b.id)})` : b.name }));
   const agentOf = new Map((agents ?? []).map((a) => [a.workspace_id, a]));
   const assignedTo = new Map((assigned ?? []).map((a) => [a.e164, a.workspace_id as string | null]));
   const businessName = new Map((businesses ?? []).map((b) => [b.id, b.name]));
@@ -65,10 +73,11 @@ export default async function VoiceAdminPage() {
                     </p>
                     <div className="mt-1.5 flex flex-wrap gap-1.5">
                       {ws ? <Badge tone="blue">{businessName.get(ws) ?? "Business"}</Badge> : <Badge>Not assigned</Badge>}
+                      {ws && ownerOf.has(ws) ? <span className="text-xs text-slate-500">Owner: {ownerOf.get(ws)}</span> : null}
                       {agent ? <Badge tone="green">AI caller connected</Badge> : <Badge>No AI caller yet</Badge>}
                     </div>
                   </div>
-                  <AssignNumberForm e164={n.phone_number} businesses={businesses ?? []} current={ws} />
+                  <AssignNumberForm e164={n.phone_number} businesses={options} current={ws} />
                 </Card>
               );
             })}
@@ -89,6 +98,7 @@ export default async function VoiceAdminPage() {
                     <div className="flex flex-wrap items-start justify-between gap-4">
                       <div className="min-w-0">
                         <p className="font-semibold text-slate-900">{b.name}</p>
+                        <p className="text-sm text-slate-500">{ownerOf.has(b.id) ? `Owner: ${ownerOf.get(b.id)}` : "No owner"}</p>
                         <div className="mt-1.5 flex flex-wrap gap-1.5">
                           {a?.retell_agent_id ? <Badge tone="green">AI caller v{a.version}</Badge> : <Badge>No AI caller</Badge>}
                           {!b.setup_completed_at ? <Badge tone="amber">Setup not finished</Badge> : null}
@@ -118,7 +128,7 @@ export default async function VoiceAdminPage() {
         {configured ? (
           <Section title="Buy a number" description="A US number in the Lead96 Retell account, billed monthly to the card on that account.">
             <Card className="p-6">
-              <BuyNumberForm businesses={businesses ?? []} />
+              <BuyNumberForm businesses={options} />
             </Card>
           </Section>
         ) : null}
