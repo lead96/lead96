@@ -1,7 +1,7 @@
 import "server-only";
 import { ingestLead } from "@/lib/leads/ingest";
 import { createAdminClient } from "@/lib/supabase/server";
-import { callMetadata, callRowFromRetell, OUTCOME_LABELS, statusAfterCall, type CallRowUpdate, type RetellCall } from "./calls";
+import { callMetadata, callRowFromRetell, OUTCOME_LABELS, statusAfterCall, withBooking, type CallRowUpdate, type RetellCall } from "./calls";
 import { scheduleRetry } from "./jobs";
 
 type Db = ReturnType<typeof createAdminClient>;
@@ -11,7 +11,7 @@ export type HandleResult = { workspaceId: string | null; callRowId: string | nul
 const HANDLED = new Set(["call_started", "call_ended", "call_analyzed"]);
 
 /** Which business a call belongs to: our metadata first, then the number dialed, then the agent. */
-async function findWorkspace(db: Db, call: RetellCall): Promise<string | null> {
+export async function findWorkspace(db: Db, call: RetellCall): Promise<string | null> {
   const meta = callMetadata(call);
   if (meta.workspace_id) return meta.workspace_id;
   if (call.direction === "inbound" && call.to_number) {
@@ -38,10 +38,10 @@ export async function handleRetellEvent(e: RetellEvent): Promise<HandleResult> {
   if (!workspaceId) return { workspaceId: null, callRowId: null, status: "rejected", error: "No business for this call (unknown number and agent)." };
 
   const meta = callMetadata(call);
-  const update = callRowFromRetell(call);
+  const raw = callRowFromRetell(call);
   const { data: existing } = await db
     .from("calls")
-    .select("id, customer_id, lead_id, outcome, summary, status")
+    .select("id, customer_id, lead_id, outcome, summary, status, appointment")
     .eq("provider_call_id", call.call_id)
     .maybeSingle();
   // Retell retries and orders events; once analyzed, later copies change nothing.
@@ -49,9 +49,11 @@ export async function handleRetellEvent(e: RetellEvent): Promise<HandleResult> {
 
   let row = existing ?? null;
   if (!row && meta.call_row_id) {
-    const { data } = await db.from("calls").select("id, customer_id, lead_id, outcome, summary, status").eq("id", meta.call_row_id).eq("workspace_id", workspaceId).maybeSingle();
+    const { data } = await db.from("calls").select("id, customer_id, lead_id, outcome, summary, status, appointment").eq("id", meta.call_row_id).eq("workspace_id", workspaceId).maybeSingle();
     row = data;
   }
+  // A visit window saved during the call (book_appointment tool) makes the call "booked".
+  const update = withBooking(raw, Boolean(row?.appointment));
 
   const direction: "inbound" | "outbound" = call.direction === "inbound" ? "inbound" : "outbound";
   const trigger = meta.trigger ?? (direction === "inbound" ? "inbound" : call.call_type === "web_call" ? "test" : "manual");

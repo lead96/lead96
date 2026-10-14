@@ -1,5 +1,5 @@
 import "server-only";
-import { serverEnv } from "@/lib/env";
+import { publicEnv, serverEnv } from "@/lib/env";
 import type { VoiceAgentConfig } from "./agent-config";
 import type { RetellCall } from "./calls";
 
@@ -13,6 +13,15 @@ export class RetellError extends Error {
   ) {
     super(message);
   }
+}
+
+/**
+ * Where Retell sends call events, tool calls and inbound-call lookups. Retell cannot reach
+ * localhost, so local development uses the live site (same database).
+ */
+export function voiceWebhookBase() {
+  const app = publicEnv().NEXT_PUBLIC_APP_URL.replace(/\/$/, "");
+  return /localhost|127\.0\.0\.1/.test(app) ? "https://lead96.com" : app;
 }
 
 export function retellConfigured() {
@@ -49,7 +58,46 @@ export async function retell<T>(method: "GET" | "POST" | "PATCH" | "DELETE", pat
 
 export type AgentIds = { llmId: string; agentId: string };
 
-function llmBody(c: VoiceAgentConfig) {
+/** Our in-call tools (Retell calls them during the conversation; signed like the webhooks). */
+function customTools(base: string) {
+  return [
+    {
+      type: "custom",
+      name: "check_availability",
+      description: "Get the open visit windows for the next days. Call before offering any day or time.",
+      url: `${base}/api/voice/tools/check_availability`,
+      method: "POST",
+      parameters: { type: "object", properties: {}, required: [] },
+      speak_during_execution: true,
+      execution_message_description: "Say you are checking the schedule.",
+      speak_after_execution: true,
+      timeout_ms: 8000,
+    },
+    {
+      type: "custom",
+      name: "book_appointment",
+      description: "Save the visit window the caller chose (date, start and end exactly as check_availability returned them) and the service address.",
+      url: `${base}/api/voice/tools/book_appointment`,
+      method: "POST",
+      parameters: {
+        type: "object",
+        properties: {
+          date: { type: "string", description: "Date of the chosen window, YYYY-MM-DD" },
+          start: { type: "string", description: "Window start, HH:MM (24h)" },
+          end: { type: "string", description: "Window end, HH:MM (24h)" },
+          address: { type: "string", description: "Service address or ZIP code they confirmed" },
+          notes: { type: "string", description: "Anything the technician should know, short" },
+        },
+        required: ["date", "start", "end"],
+      },
+      speak_during_execution: false,
+      speak_after_execution: true,
+      timeout_ms: 8000,
+    },
+  ];
+}
+
+function llmBody(c: VoiceAgentConfig, base: string) {
   const tools: Record<string, unknown>[] = [
     {
       type: "end_call",
@@ -57,6 +105,7 @@ function llmBody(c: VoiceAgentConfig) {
       description: "End the call when the conversation is finished, they asked not to be called, it is a wrong number, or you reached voicemail.",
     },
   ];
+  tools.push(...customTools(base));
   if (c.transferPhone) {
     tools.push({
       type: "transfer_call",
@@ -105,10 +154,11 @@ function agentBody(c: VoiceAgentConfig, llmId: string, webhookUrl: string) {
 }
 
 /** Creates the business's Retell LLM and agent, or updates them in place. */
-export async function upsertAgent(c: VoiceAgentConfig, existing: Partial<AgentIds>, webhookUrl: string): Promise<AgentIds> {
+export async function upsertAgent(c: VoiceAgentConfig, existing: Partial<AgentIds>, base: string): Promise<AgentIds> {
+  const webhookUrl = `${base}/api/voice/retell`;
   const llm = existing.llmId
-    ? await retell<{ llm_id: string }>("PATCH", `/update-retell-llm/${existing.llmId}`, llmBody(c))
-    : await retell<{ llm_id: string }>("POST", "/create-retell-llm", llmBody(c));
+    ? await retell<{ llm_id: string }>("PATCH", `/update-retell-llm/${existing.llmId}`, llmBody(c, base))
+    : await retell<{ llm_id: string }>("POST", "/create-retell-llm", llmBody(c, base));
   const body = agentBody(c, llm.llm_id, webhookUrl);
   const agent = existing.agentId
     ? await retell<{ agent_id: string }>("PATCH", `/update-agent/${existing.agentId}`, body)
@@ -178,12 +228,16 @@ export async function buyNumber(opts: { areaCode?: number; nickname?: string }):
   });
 }
 
-/** Points a number at a business's agent (or detaches it with agentId = null). */
+/**
+ * Points a number at a business's agent (or detaches it with agentId = null). Incoming calls ask
+ * our inbound webhook first, so a known caller is greeted by name.
+ */
 export async function bindNumber(e164: string, agentId: string | null, opts: { nickname?: string } = {}) {
   const agents = agentId ? [{ agent_id: agentId, weight: 1 }] : [];
   return retell<RetellNumber>("PATCH", `/update-phone-number/${encodeURIComponent(e164)}`, {
     inbound_agents: agents,
     outbound_agents: agents,
+    inbound_webhook_url: agentId ? `${voiceWebhookBase()}/api/voice/inbound` : null,
     ...(opts.nickname !== undefined ? { nickname: opts.nickname.slice(0, 100) } : {}),
   });
 }

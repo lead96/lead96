@@ -1,19 +1,10 @@
 import "server-only";
-import { publicEnv } from "@/lib/env";
 import { createAdminClient } from "@/lib/supabase/server";
 import { buildAgentConfig, configHash, VOICE_PROMPT_VERSION, type VoiceAgentConfig } from "./agent-config";
 import { loadAgentInput } from "./input";
-import { bindNumber, RetellError, upsertAgent } from "./retell";
+import { bindNumber, RetellError, upsertAgent, voiceWebhookBase } from "./retell";
 
-/**
- * Where Retell sends call events. Retell cannot reach localhost, so local development uses the
- * live site (same database) for webhooks.
- */
-export function voiceWebhookBase() {
-  const app = publicEnv().NEXT_PUBLIC_APP_URL.replace(/\/$/, "");
-  return /localhost|127\.0\.0\.1/.test(app) ? "https://lead96.com" : app;
-}
-
+export { voiceWebhookBase };
 export type SyncResult = { status: "created" | "updated" | "unchanged"; version: number; agentId: string } | { status: "error"; error: string };
 
 /**
@@ -37,7 +28,7 @@ export async function syncVoiceAgent(workspaceId: string, actorId: string | null
 
   let ids;
   try {
-    ids = await upsertAgent(config, { llmId: current?.retell_llm_id ?? undefined, agentId: current?.retell_agent_id ?? undefined }, webhookUrl);
+    ids = await upsertAgent(config, { llmId: current?.retell_llm_id ?? undefined, agentId: current?.retell_agent_id ?? undefined }, voiceWebhookBase());
   } catch (e) {
     const error = e instanceof RetellError ? e.message : e instanceof Error ? e.message : "Could not reach Retell.";
     await db

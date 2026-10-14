@@ -154,6 +154,12 @@ export function callRowFromRetell(call: RetellCall): CallRowUpdate {
   };
 }
 
+/** A call where the caller chose a visit window counts as booked (not for no answer, transfer, do-not-call...). */
+export function withBooking(u: CallRowUpdate, booked: boolean): CallRowUpdate {
+  if (!booked || !["qualified", "callback", "other"].includes(u.outcome ?? "")) return u;
+  return { ...u, outcome: "booked", needs_review: u.analysis.emergency === true || (u.confidence !== null && u.confidence < 0.6) };
+}
+
 /** Customer status after an AI call: only ever moves forward from new/contacted. */
 export function statusAfterCall(current: string, outcome: CallOutcome | null): string | null {
   if (!outcome || !["new", "contacted"].includes(current)) return null;

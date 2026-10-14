@@ -9,7 +9,7 @@ import { createHash } from "node:crypto";
 import { WEEKDAYS, WEEKDAY_LABELS, type AgentQuestion, type BookingHours } from "@/lib/setup/draft";
 
 /** Bump when the prompt text or analysis fields change, so every business gets re-synced. */
-export const VOICE_PROMPT_VERSION = "2026-10-14.1";
+export const VOICE_PROMPT_VERSION = "2026-10-14.2";
 
 export const CALL_OUTCOMES = [
   "booked",
@@ -129,15 +129,16 @@ If a value says "unknown", ask for it instead of guessing.
 - Short, friendly sentences. One question at a time. Let them finish; do not repeat questions they already answered.
 - Plain US English. Read phone numbers and times naturally.
 - Do not give prices, diagnoses or guarantees. Say a technician will go over it during the visit.
-- Do not promise an exact appointment. Agree on a preferred day and time window inside the visit hours and say the team will confirm it shortly by phone or text.
+- Only offer visit windows that check_availability returned. Never invent days or times.
 
 ## Steps
 1. Confirm it is a good time. If not, ask when to call back, thank them, and end the call.
 2. Ask about the job, then these questions (skip any already answered):
 ${i.questions.map(questionLine).join("\n") || "- What is going on, and since when?"}
 3. Confirm the service address or at least the ZIP code. If it is clearly outside the service area, say so politely and that the team will follow up if they can help.
-4. Ask for the preferred day and time window. Repeat back the day, window and address.
-5. Close: thank them and say the team will confirm the visit shortly.
+4. Call check_availability, then offer two or three of the windows it returns (for example "Thursday 8 to 12, or Thursday afternoon"). If none suits them, ask what would work and note it.
+5. When they choose a window, repeat back the day, window and address, then call book_appointment with that window and the address.
+6. Close: thank them and say the team will confirm the visit shortly by phone or text.
 
 ## Special cases
 - Emergency (gas smell, carbon monoxide alarm, smoke, sparks, flooding): tell them to leave the building and call 911 or the gas company right away.${transferEmergency ? " Then transfer the call to the team." : " The team will call them back as a priority."}
@@ -241,5 +242,25 @@ export function leadCallVariables(
     lead_source: l.source,
     call_reason: "calling back a new service request they just sent",
     known_caller: l.known ? "yes" : "no",
+  };
+}
+
+/** Per-call variables for an incoming call from someone the business already knows. */
+export function inboundCallVariables(
+  businessName: string,
+  caller: { full_name: string | null; serviceLabel: string | null; zip: string | null } | null,
+): Record<string, string> {
+  const name = caller?.full_name?.trim();
+  if (!caller || !name) return {};
+  const first = name.split(/\s+/)[0];
+  const service = (caller.serviceLabel ?? "service").toLowerCase();
+  return {
+    opening: `Thanks for calling ${businessName}. This is the virtual assistant, and this call may be recorded. Am I speaking with ${first}?`,
+    lead_name: name,
+    lead_first_name: first,
+    lead_service: service,
+    lead_zip: caller.zip ?? "unknown",
+    known_caller: "yes",
+    call_reason: `inbound call from an existing customer who asked about ${service} before`,
   };
 }

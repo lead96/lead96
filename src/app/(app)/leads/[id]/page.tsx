@@ -163,6 +163,8 @@ export default async function CustomerPage({ params }: PageProps<"/leads/[id]">)
           title: p.from !== p.to ? `Call outcome corrected to ${OUTCOME_LABELS[p.to as CallOutcome] ?? p.to}` : "Call reviewed",
           detail: actorName(e.actor_id) ? `by ${actorName(e.actor_id)}` : undefined,
         };
+      case "appointment.requested":
+        return { title: `Visit requested: ${p.label}`, detail: [p.address, p.notes, "chosen on an AI call, team to confirm"].filter(Boolean).join(" · ") };
       case "customer.do_not_call":
         return { title: "Do not call", detail: p.reason };
       case "customer.possible_duplicate":

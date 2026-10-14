@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { buildAgentConfig, configHash, leadCallVariables, type AgentInput } from "@/lib/voice/agent-config";
-import { callRowFromRetell, deriveOutcome, statusAfterCall, type RetellCall } from "@/lib/voice/calls";
+import { buildAgentConfig, configHash, inboundCallVariables, leadCallVariables, type AgentInput } from "@/lib/voice/agent-config";
+import { callRowFromRetell, deriveOutcome, statusAfterCall, withBooking, type RetellCall } from "@/lib/voice/calls";
 import { callAnswers, outcomeLabel } from "@/lib/voice/present";
 import { signRetell, verifyRetell } from "@/lib/voice/signature";
 
@@ -186,5 +186,33 @@ describe("call answers shown in the app", () => {
     expect(outcomeLabel(null, "registered")).toBe("Calling...");
     expect(outcomeLabel(null, "error")).toBe("Call failed");
     expect(outcomeLabel("qualified", "ended")).toBe("Qualified");
+  });
+});
+
+describe("incoming calls", () => {
+  it("greets a known caller by name with what they asked about", () => {
+    const v = inboundCallVariables("Cool Air HVAC", { full_name: "Maria Lopez", serviceLabel: "AC / Heating Repair", zip: "75201" });
+    expect(v.opening).toBe("Thanks for calling Cool Air HVAC. This is the virtual assistant, and this call may be recorded. Am I speaking with Maria?");
+    expect(v).toMatchObject({ lead_name: "Maria Lopez", lead_service: "ac / heating repair", lead_zip: "75201", known_caller: "yes" });
+  });
+  it("leaves unknown callers on the default greeting", () => {
+    expect(inboundCallVariables("Cool Air HVAC", null)).toEqual({});
+    expect(inboundCallVariables("Cool Air HVAC", { full_name: " ", serviceLabel: null, zip: null })).toEqual({});
+  });
+});
+
+describe("calls where the caller chose a visit window", () => {
+  const base = callRowFromRetell(ended());
+  it("count as booked instead of qualified / callback / unclear", () => {
+    expect(withBooking(base, true).outcome).toBe("booked");
+    expect(withBooking({ ...base, outcome: "other", needs_review: true }, true)).toMatchObject({ outcome: "booked", needs_review: false });
+    expect(withBooking(base, false).outcome).toBe("qualified");
+  });
+  it("never override no answer, transfer or do-not-call", () => {
+    for (const o of ["no_answer", "transferred", "do_not_call", "voicemail"] as const) expect(withBooking({ ...base, outcome: o }, true).outcome).toBe(o);
+  });
+  it("still flags emergencies and low confidence for review", () => {
+    expect(withBooking({ ...base, analysis: { emergency: true } }, true).needs_review).toBe(true);
+    expect(withBooking({ ...base, confidence: 0.3 }, true).needs_review).toBe(true);
   });
 });

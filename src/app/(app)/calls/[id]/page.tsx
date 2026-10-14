@@ -59,6 +59,12 @@ export default async function CallPage({ params }: PageProps<"/calls/[id]">) {
               {call.confidence !== null ? <span className="text-xs text-slate-500">AI confidence {Math.round(Number(call.confidence) * 100)}%</span> : null}
             </div>
             {call.summary ? <p className="text-sm leading-relaxed text-slate-700">{call.summary}</p> : null}
+            {call.appointment ? (
+              <p className="rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
+                Visit requested: <span className="font-medium">{(call.appointment as { label: string }).label}</span>
+                {(call.appointment as { address?: string }).address ? ` · ${(call.appointment as { address?: string }).address}` : ""}
+              </p>
+            ) : null}
             {call.error ? <p className="text-sm text-red-600">{call.error}</p> : null}
             {customer ? (
               <Link href={`/leads/${customer.id}`} className="inline-block text-sm font-medium text-brand-700 hover:underline">
