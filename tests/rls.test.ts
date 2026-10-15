@@ -444,6 +444,41 @@ describe.skipIf(!configured)("row-level security", () => {
     await admin.from("appointments").delete().eq("workspace_id", wsA);
   }, 120_000);
 
+  it("visit messages: planned on booking, replaced on move, dropped on cancel; members read, only the server claims", async () => {
+    const day = new Date(Date.now() + 5 * 86_400_000).toISOString().slice(0, 10);
+    const starts = `${day}T13:00:00.000Z`;
+    const cust = await admin.from("customers").insert({ workspace_id: wsA, full_name: "Note Test", phone: `+1214555${String(Date.now()).slice(-4)}` }).select("id").single();
+    const appt = await admin.rpc("book_window", { p_workspace: wsA, p_starts: starts, p_ends: `${day}T17:00:00.000Z`, p_window_cap: 5, p_day_cap: 5, p_tz: "America/Chicago", p_customer: cust.data!.id, p_source: "manual" });
+    expect(appt.error).toBeNull();
+    const jobs = async () => (await admin.from("notification_jobs").select("kind, status, run_at").eq("appointment_id", appt.data).order("created_at")).data!;
+    let j = await jobs();
+    expect(j.map((x) => x.kind).sort()).toEqual(["confirmation", "reminder_24h", "reminder_2h", "team_new_booking"]);
+    expect(Date.parse(j.find((x) => x.kind === "reminder_24h")!.run_at)).toBe(Date.parse(starts) - 24 * 3_600_000);
+    expect(Date.parse(j.find((x) => x.kind === "reminder_2h")!.run_at)).toBe(Date.parse(starts) - 2 * 3_600_000);
+
+    // Moving the visit replaces the reminders and adds a "moved" message.
+    const later = `${day}T18:00:00.000Z`;
+    expect((await admin.rpc("reschedule_appointment", { p_id: appt.data, p_starts: later, p_ends: `${day}T22:00:00.000Z`, p_window_cap: 5, p_day_cap: 5, p_tz: "America/Chicago" })).error).toBeNull();
+    j = await jobs();
+    expect(j.filter((x) => x.kind === "reminder_24h" && x.status === "queued").map((x) => Date.parse(x.run_at))).toEqual([Date.parse(later) - 24 * 3_600_000]);
+    expect(j.filter((x) => x.kind === "reminder_24h" && x.status === "cancelled")).toHaveLength(1);
+    expect(j.some((x) => x.kind === "rescheduled")).toBe(true);
+
+    // Cancelling drops queued reminders and plans a "cancelled" message.
+    expect((await staffA.client.rpc("set_appointment_status", { p_id: appt.data, p_status: "cancelled", p_reason: "test" })).error).toBeNull();
+    j = await jobs();
+    expect(j.filter((x) => x.kind.startsWith("reminder") && x.status === "queued")).toEqual([]);
+    expect(j.some((x) => x.kind === "cancelled" && x.status === "queued")).toBe(true);
+
+    // Members read, other businesses do not; nobody signed in writes or claims.
+    expect((await staffA.client.from("notification_jobs").select("id").eq("appointment_id", appt.data)).data!.length).toBeGreaterThan(0);
+    expect((await ownerB.client.from("notification_jobs").select("id").eq("appointment_id", appt.data)).data).toEqual([]);
+    expect((await ownerA.client.from("notification_jobs").insert({ workspace_id: wsA, appointment_id: appt.data, kind: "confirmation" })).error).not.toBeNull();
+    expect((await ownerA.client.rpc("claim_notification_jobs", { p_limit: 5 })).error).not.toBeNull();
+
+    await admin.from("appointments").delete().eq("workspace_id", wsA);
+  }, 120_000);
+
   it("ZIP lookup: readable by any signed-in user, not writable, and finds real ZIPs", async () => {
     const miami = await ownerA.client.rpc("zip_city_matches", { p_city: "miami", p_state: "FL" });
     expect(miami.data).toHaveLength(1);

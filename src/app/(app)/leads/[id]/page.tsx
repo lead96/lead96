@@ -198,6 +198,11 @@ export default async function CustomerPage({ params }: PageProps<"/leads/[id]">)
           title: { "appointment.confirmed": "Visit confirmed", "appointment.completed": "Visit done", "appointment.no_show": "No-show", "appointment.cancelled": "Visit cancelled", "appointment.scheduled": "Visit reopened" }[e.type]!,
           detail: [p.reason, actorName(e.actor_id) ? `by ${actorName(e.actor_id)}` : null].filter(Boolean).join(" · ") || undefined,
         };
+      case "email.sent":
+        return {
+          title: { confirmation: "Booking confirmation email sent", reminder_24h: "Reminder email sent (day before)", reminder_2h: "Reminder email sent (2 hours before)", rescheduled: "Email sent: visit moved", cancelled: "Email sent: visit cancelled" }[p.kind ?? ""] ?? "Email sent",
+          detail: [p.when, p.to].filter(Boolean).join(" · ") || undefined,
+        };
       case "appointment.requested":
         return { title: `Visit requested: ${p.label}`, detail: [p.address, p.notes, "chosen on an AI call, team to confirm"].filter(Boolean).join(" · ") };
       case "customer.do_not_call":

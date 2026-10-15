@@ -8,8 +8,18 @@ export type Email = {
   html: string;
   text: string;
   replyTo?: string;
+  /** Shown as the sender name (e.g. the business); the address stays the verified Lead96 one. */
+  fromName?: string;
 };
 export type SendResult = { ok: true; id: string } | { ok: false; error: string };
+
+/** "Cool Air HVAC <no-reply@lead96.com>": a custom sender name on our verified address. */
+function fromHeader(defaultFrom: string, name?: string) {
+  if (!name) return defaultFrom;
+  const address = (/<([^>]+)>/.exec(defaultFrom)?.[1] ?? defaultFrom).trim();
+  const clean = name.replace(/[<>"\r\n]/g, "").trim().slice(0, 80);
+  return clean ? `${clean} <${address}>` : defaultFrom;
+}
 
 /**
  * Sends one email through the Resend API (app emails such as invites; auth emails go through
@@ -29,7 +39,7 @@ export async function sendEmail(email: Email, idempotencyKey?: string): Promise<
         ...(idempotencyKey ? { "idempotency-key": idempotencyKey } : {}),
       },
       body: JSON.stringify({
-        from: env.EMAIL_FROM,
+        from: fromHeader(env.EMAIL_FROM, email.fromName),
         to: [email.to],
         subject: email.subject,
         html: email.html,

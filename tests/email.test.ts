@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { isUndeliverableAddress } from "@/lib/email/address";
-import { inviteEmail } from "@/lib/email/templates";
+import { inviteEmail, teamBookingEmail, visitEmail } from "@/lib/email/templates";
 
 describe("invite email", () => {
   const url = "https://lead96.com/invite/abc123";
@@ -48,5 +48,36 @@ describe("test addresses are never emailed", () => {
   });
   it("allows real domains", () => {
     for (const a of ["kaen197517@gmail.com", "admin@lead96.com", "x@examples.com"]) expect(isUndeliverableAddress(a)).toBe(false);
+  });
+});
+
+describe("visit emails", () => {
+  const p = { business: "Cool Air HVAC", firstName: "Maria", when: "Thu Oct 15, 8am - 12pm", address: "77 Elm St, 75201", businessPhone: "+12145550100" };
+  it("confirmation names the business, the window, the address and how to change it", () => {
+    const e = visitEmail("confirmation", p);
+    expect(e.subject).toBe("Your visit with Cool Air HVAC is booked: Thu Oct 15, 8am - 12pm");
+    expect(e.text).toContain("Hi Maria,");
+    expect(e.text).toContain("77 Elm St, 75201");
+    expect(e.text).toContain("call us at (214) 555-0100");
+  });
+  it("each kind has its own subject; cancelled does not show the window as a booking", () => {
+    expect(visitEmail("reminder_24h", p).subject).toMatch(/^Reminder: Cool Air HVAC visit tomorrow/);
+    expect(visitEmail("reminder_2h", p).subject).toMatch(/arrives soon/);
+    expect(visitEmail("rescheduled", p).subject).toMatch(/was moved/);
+    const c = visitEmail("cancelled", p);
+    expect(c.subject).toBe("Your Cool Air HVAC visit was cancelled");
+    expect(c.text).not.toContain("77 Elm St");
+  });
+  it("works without a name or phone, and escapes HTML", () => {
+    const e = visitEmail("confirmation", { ...p, firstName: null, businessPhone: null, business: "<b>Bad</b>" });
+    expect(e.text.startsWith("Hi,")).toBe(true);
+    expect(e.text).toContain("reply to this email");
+    expect(e.html).not.toContain("<b>Bad</b>");
+  });
+  it("tells the team about new bookings with a link to the calendar", () => {
+    const e = teamBookingEmail({ business: "Cool Air HVAC", customer: "Maria Lopez", phone: "+12145550142", when: "Thu Oct 15, 8am - 12pm", address: null, bookedBy: "Booked by the AI on a call", url: "https://lead96.com/calendar" });
+    expect(e.subject).toBe("New visit booked: Maria Lopez, Thu Oct 15, 8am - 12pm");
+    expect(e.text).toContain("(214) 555-0142");
+    expect(e.html).toContain('href="https://lead96.com/calendar"');
   });
 });
