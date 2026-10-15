@@ -24,7 +24,8 @@ export async function submitLandingForm(_: SubmitState, data: FormData): Promise
   if (f(data, "company_website") || !startedAt || Date.now() - startedAt < MIN_FILL_MS) {
     return { ok: true }; // look successful to bots, store nothing
   }
-  if (data.get("consent") !== "yes") return { error: "Please tick the box to agree to be contacted.", fields };
+  // Consent is optional (carrier rules): without it the lead is still saved, but the AI never calls or texts.
+  const consented = data.get("consent") === "yes";
 
   const admin = createAdminClient();
   const { data: page } = await admin
@@ -61,8 +62,9 @@ export async function submitLandingForm(_: SubmitState, data: FormData): Promise
     fbclid: f(data, "fbclid"),
     page_url: f(data, "page_url", 1000),
     referrer: f(data, "referrer", 1000),
-    consent_given: true,
+    consent_given: consented,
     consent: {
+      given: consented,
       text: consentText(content.business_name),
       version: CONSENT_VERSION,
       at: new Date().toISOString(),

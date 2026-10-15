@@ -3,7 +3,7 @@ import { NextResponse, type NextRequest } from "next/server";
 
 // /invite and /reset-password handle the signed-out case themselves, with a clearer message.
 // /p/* are published landing pages for homeowners. /api/intake/* and /api/cron/* check their own keys.
-const PUBLIC_PATHS = ["/", "/login", "/signup", "/forgot-password", "/reset-password", "/auth", "/invite", "/p", "/api/intake", "/api/cron", "/api/voice"];
+const PUBLIC_PATHS = ["/", "/login", "/signup", "/forgot-password", "/reset-password", "/auth", "/invite", "/p", "/api/intake", "/api/cron", "/api/voice", "/privacy", "/terms", "/imprint"];
 
 function isPublic(pathname: string) {
   return PUBLIC_PATHS.some((p) => pathname === p || (p !== "/" && pathname.startsWith(`${p}/`)));

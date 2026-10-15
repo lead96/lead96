@@ -502,8 +502,19 @@ export default async function HomePage() {
             </div>
           </div>
         </div>
-        <div className="mx-auto max-w-6xl border-t border-slate-100 px-4 py-6 text-xs text-slate-400 sm:px-6">
-          © {new Date().getFullYear()} Lead96. All rights reserved.
+        <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 border-t border-slate-100 px-4 py-6 text-xs text-slate-400 sm:px-6">
+          <span>© {new Date().getFullYear()} Lead96. All rights reserved.</span>
+          <nav className="flex gap-4">
+            <Link href="/privacy" className="hover:text-slate-700">
+              Privacy Policy
+            </Link>
+            <Link href="/terms" className="hover:text-slate-700">
+              Terms
+            </Link>
+            <Link href="/imprint" className="hover:text-slate-700">
+              Imprint
+            </Link>
+          </nav>
         </div>
       </footer>
     </div>

@@ -104,6 +104,14 @@ export function LandingPage({ template, content, pageId, preview = false }: Prop
         <div className="mx-auto max-w-5xl px-4 py-6 text-xs text-slate-500">
           © {new Date().getFullYear()} {c.business_name}
           {c.service_area ? ` · Serving ${c.service_area}` : ""}
+          {" · "}
+          <a href="/privacy" className="hover:underline">
+            Privacy
+          </a>
+          {" · "}
+          <a href="/terms" className="hover:underline">
+            Terms
+          </a>
         </div>
       </footer>
     </div>
@@ -293,8 +301,18 @@ function Hidden({ pageId, tracking }: { pageId?: string; tracking: Record<string
 function Consent({ c }: { c: LandingContent }) {
   return (
     <label className="flex items-start gap-2 text-xs leading-snug text-slate-500">
-      <input type="checkbox" name="consent" value="yes" required className="mt-0.5 h-4 w-4 shrink-0 accent-(--accent)" />
-      <span>{consentText(c.business_name)}</span>
+      {/* Optional and unticked: carriers reject forms where texting consent is required or pre-checked. */}
+      <input type="checkbox" name="consent" value="yes" className="mt-0.5 h-4 w-4 shrink-0 accent-(--accent)" />
+      <span>
+        {consentText(c.business_name).replace(/ Privacy Policy: .*$/, "")}{" "}
+        <a href="/privacy" target="_blank" className="underline">
+          Privacy Policy
+        </a>{" "}
+        ·{" "}
+        <a href="/terms" target="_blank" className="underline">
+          Terms
+        </a>
+      </span>
     </label>
   );
 }

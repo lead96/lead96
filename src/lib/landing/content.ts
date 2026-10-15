@@ -12,10 +12,13 @@ export const TEMPLATES = [
 ] as const;
 export type TemplateKey = (typeof TEMPLATES)[number]["value"];
 
-/** Shown next to every form. Bump the version whenever the wording changes; it is stored with each lead. */
-export const CONSENT_VERSION = "2026-10-08";
+/**
+ * The optional consent checkbox next to every form (carriers require it to be optional and unticked).
+ * Bump the version whenever the wording changes; it is stored with each lead.
+ */
+export const CONSENT_VERSION = "2026-10-15";
 export function consentText(businessName: string) {
-  return `By submitting, I agree that ${businessName || "this business"} may call or text me at the number provided, including with automated or AI-assisted calls, about my request. Consent is not a condition of purchase. Message and data rates may apply.`;
+  return `I agree that ${businessName || "this business"} may call and text me at the number I provided, including with automated and AI-assisted calls and texts, about my request (follow-ups, scheduling and appointment reminders). Consent is not a condition of purchase. Message frequency varies. Message and data rates may apply. Reply STOP to opt out, HELP for help. Privacy Policy: lead96.com/privacy. Terms: lead96.com/terms.`;
 }
 
 const text = (max: number) => z.string().trim().max(max);
