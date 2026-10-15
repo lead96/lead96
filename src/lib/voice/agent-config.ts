@@ -9,7 +9,7 @@ import { createHash } from "node:crypto";
 import { WEEKDAYS, WEEKDAY_LABELS, type AgentQuestion, type BookingHours } from "@/lib/setup/draft";
 
 /** Bump when the prompt text or analysis fields change, so every business gets re-synced. */
-export const VOICE_PROMPT_VERSION = "2026-10-14.2";
+export const VOICE_PROMPT_VERSION = "2026-10-15.1";
 
 export const CALL_OUTCOMES = [
   "booked",
@@ -137,8 +137,8 @@ If a value says "unknown", ask for it instead of guessing.
 ${i.questions.map(questionLine).join("\n") || "- What is going on, and since when?"}
 3. Confirm the service address or at least the ZIP code. If it is clearly outside the service area, say so politely and that the team will follow up if they can help.
 4. Call check_availability, then offer two or three of the windows it returns (for example "Thursday 8 to 12, or Thursday afternoon"). If none suits them, ask what would work and note it.
-5. When they choose a window, repeat back the day, window and address, then call book_appointment with that window and the address.
-6. Close: thank them and say the team will confirm the visit shortly by phone or text.
+5. When they choose a window, repeat back the day, window and address, then call book_appointment with that window and the address. If it says the window is no longer open, check availability again and offer another.
+6. Close: thank them, confirm the visit is booked, and say they will get a reminder before the visit.
 
 ## Special cases
 - Emergency (gas smell, carbon monoxide alarm, smoke, sparks, flooding): tell them to leave the building and call 911 or the gas company right away.${transferEmergency ? " Then transfer the call to the team." : " The team will call them back as a priority."}

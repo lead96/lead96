@@ -378,6 +378,72 @@ describe.skipIf(!configured)("row-level security", () => {
     expect((await admin.from("messages").select("body").eq("id", msg.data!.id).single()).data!.body).toBe("Hi");
   }, 120_000);
 
+  it("change history: every change logged with who and old/new values; owners read, nobody edits", async () => {
+    // A user change (through the owner's own RPC) is recorded with their id and only the changed fields.
+    const cust = await admin.from("customers").insert({ workspace_id: wsA, full_name: "History Test", phone: `+1214777${String(Date.now()).slice(-4)}` }).select("id").single();
+    expect((await ownerA.client.rpc("set_customer_status", { p_customer: cust.data!.id, p_status: "contacted", p_reason: "test" })).error).toBeNull();
+    const rows = (await admin.from("change_log").select("action, via, actor_id, changed_fields, old_values, new_values").eq("table_name", "customers").eq("row_id", cust.data!.id).order("id")).data!;
+    expect(rows[0]).toMatchObject({ action: "insert", via: "system", actor_id: null });
+    expect(rows[1]).toMatchObject({ action: "update", via: "user", actor_id: ownerA.id, changed_fields: ["status"], old_values: { status: "new" }, new_values: { status: "contacted" } });
+
+    // Secrets are never copied into the history.
+    const inv = await admin.from("workspace_invites").insert({ workspace_id: wsA, email: `hist-${run}@test.leadgen.invalid` }).select("id, token").single();
+    const invLog = (await admin.from("change_log").select("new_values").eq("table_name", "workspace_invites").eq("row_id", inv.data!.id).single()).data!;
+    expect(invLog.new_values).not.toHaveProperty("token");
+    expect(JSON.stringify(invLog)).not.toContain(inv.data!.token);
+
+    // Owners read their business's history; staff and other businesses do not.
+    expect((await ownerA.client.from("change_log").select("id").eq("row_id", cust.data!.id)).data!.length).toBeGreaterThanOrEqual(2);
+    expect((await staffA.client.from("change_log").select("id").eq("row_id", cust.data!.id)).data).toEqual([]);
+    expect((await ownerB.client.from("change_log").select("id").eq("row_id", cust.data!.id)).data).toEqual([]);
+
+    // Append-only: nobody can write, change or remove history, not even the server.
+    expect((await ownerA.client.from("change_log").insert({ table_name: "x", row_id: "x", action: "insert", via: "user" })).error).not.toBeNull();
+    const first = (await admin.from("change_log").select("id").eq("row_id", cust.data!.id).order("id").limit(1).single()).data!;
+    expect((await admin.from("change_log").update({ action: "delete" }).eq("id", first.id)).error).not.toBeNull();
+    expect((await admin.from("change_log").delete().eq("id", first.id)).error).not.toBeNull();
+
+    // Deleting a row keeps a record of what it was.
+    await admin.from("workspace_invites").delete().eq("id", inv.data!.id);
+    const del = (await admin.from("change_log").select("action, old_values").eq("table_name", "workspace_invites").eq("row_id", inv.data!.id).eq("action", "delete").single()).data!;
+    expect(del.old_values).toMatchObject({ email: `hist-${run}@test.leadgen.invalid` });
+  }, 120_000);
+
+  it("calendar: members book through the function, capacity holds under parallel bookings, owners block days", async () => {
+    const day = new Date(Date.now() + 10 * 86_400_000).toISOString().slice(0, 10);
+    const starts = `${day}T13:00:00.000Z`;
+    const ends = `${day}T17:00:00.000Z`;
+    const cust = await admin.from("customers").insert({ workspace_id: wsA, full_name: "Cal Test", phone: `+1214666${String(Date.now()).slice(-4)}` }).select("id").single();
+    const book = (client: typeof admin, cap = 1, dayCap = 5) =>
+      client.rpc("book_window", { p_workspace: wsA, p_starts: starts, p_ends: ends, p_window_cap: cap, p_day_cap: dayCap, p_tz: "America/Chicago", p_customer: cust.data!.id, p_source: "manual" });
+
+    // Direct writes are not possible; other businesses cannot book here.
+    expect((await ownerA.client.from("appointments").insert({ workspace_id: wsA, starts_at: starts, ends_at: ends, source: "manual" })).error).not.toBeNull();
+    expect((await book(ownerB.client)).error).not.toBeNull();
+
+    // Staff books; the customer moves to "appointment"; the window (capacity 1) is then full.
+    const first = await book(staffA.client);
+    expect(first.error).toBeNull();
+    expect((await admin.from("customers").select("status").eq("id", cust.data!.id).single()).data!.status).toBe("appointment");
+    expect((await book(staffA.client)).error?.message).toBe("full");
+    expect((await staffA.client.from("appointments").select("id").eq("id", first.data)).data).toHaveLength(1);
+    expect((await ownerB.client.from("appointments").select("id").eq("id", first.data)).data).toEqual([]);
+
+    // Concurrency: 5 parallel bookings for the last place in a capacity-2 window -> exactly one wins.
+    const parallel = await Promise.all(Array.from({ length: 5 }, () => book(admin, 2)));
+    expect(parallel.filter((r) => !r.error).length).toBe(1);
+    expect(parallel.filter((r) => r.error?.message === "full").length).toBe(4);
+
+    // Cancelling frees the place; staff cannot block days, owners can, and blocked days refuse bookings.
+    expect((await staffA.client.rpc("set_appointment_status", { p_id: first.data, p_status: "cancelled", p_reason: "test" })).error).toBeNull();
+    expect((await staffA.client.from("calendar_blackouts").insert({ workspace_id: wsA, starts_on: day, ends_on: day })).error).not.toBeNull();
+    expect((await ownerA.client.from("calendar_blackouts").insert({ workspace_id: wsA, starts_on: day, ends_on: day })).error).toBeNull();
+    expect((await book(staffA.client, 5)).error?.message).toBe("blocked");
+
+    await admin.from("calendar_blackouts").delete().eq("workspace_id", wsA);
+    await admin.from("appointments").delete().eq("workspace_id", wsA);
+  }, 120_000);
+
   it("ZIP lookup: readable by any signed-in user, not writable, and finds real ZIPs", async () => {
     const miami = await ownerA.client.rpc("zip_city_matches", { p_city: "miami", p_state: "FL" });
     expect(miami.data).toHaveLength(1);

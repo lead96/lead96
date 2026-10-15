@@ -61,7 +61,7 @@ export default async function CallPage({ params }: PageProps<"/calls/[id]">) {
             {call.summary ? <p className="text-sm leading-relaxed text-slate-700">{call.summary}</p> : null}
             {call.appointment ? (
               <p className="rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
-                Visit requested: <span className="font-medium">{(call.appointment as { label: string }).label}</span>
+                Visit booked: <span className="font-medium">{(call.appointment as { label: string }).label}</span>
                 {(call.appointment as { address?: string }).address ? ` · ${(call.appointment as { address?: string }).address}` : ""}
               </p>
             ) : null}

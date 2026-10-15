@@ -76,6 +76,9 @@ export default async function AdminPage({ searchParams }: PageProps<"/admin">) {
             <Link href="/admin/voice" className="font-medium text-brand-700 hover:underline">
               AI voice
             </Link>
+            <Link href="/admin/history" className="font-medium text-brand-700 hover:underline">
+              Change history
+            </Link>
             <Badge tone={STATE[overall].tone}>{STATE[overall].label}</Badge>
             <span>Updated {formatDateTime(r.generated_at, TZ)} ET</span>
           </div>

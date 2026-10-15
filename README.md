@@ -91,6 +91,17 @@ Lead96 owns one Retell account (agency model). Each business gets its own Retell
 
 `public.us_zip_codes` holds ~41k US ZIPs with city, state and coordinates, from [GeoNames](https://www.geonames.org) postal codes (CC BY 4.0 - keep the attribution). The CSV is in `supabase/seed/us_zip_codes.csv`; load it with `npm run db:seed:zips` after the migration (idempotent). The setup chat uses `zip_city_matches` / `zips_within` to turn "Miami, 20 miles" into a ZIP list - the AI never generates ZIP codes.
 
+### Calendar (M4)
+
+Lead96 has its own calendar (Google Calendar sync comes later). Visits are **arrival windows**: the visit hours from the setup are split at noon into morning / afternoon windows (`src/lib/voice/availability.ts`). The availability engine (`src/lib/calendar/slots.ts`) removes windows that are full, days that are full and blocked days: capacity is the setup's "jobs per day" spread over that day's windows (without it, one visit per window). Times are converted with the business time zone (`localToUtc`, DST-safe).
+
+- **Booking** goes through `book_window()` (migration 019): it takes a per-business advisory lock and re-checks blocked days, the window and the day before inserting, so parallel callers can never take the last place twice (tested with 5 parallel bookings). The AI's `book_appointment` tool and the team's **Book visit** (customer page) both use `bookWindow()` in `src/lib/calendar/service.ts`. A booking moves the customer to Appointment and adds a timeline entry; an unknown inbound caller who books becomes a customer at once.
+- **Calendar page** (`/calendar`): visits by day with Confirm / Done / No-show / Move / Cancel (`set_appointment_status()`, `reschedule_appointment()`), Done moves the customer to Showed, Cancel frees the place. Owners block days (`calendar_blackouts`); visits already booked on those days stay.
+
+### Change history
+
+Every insert, update and delete on the important tables (businesses, members, invites, customers, leads, calls, texts, landing pages, setup, AI callers, phone numbers, ad accounts, user profiles) is written to `change_log` by a database trigger (`log_change()`, migration 018): who (`auth.uid()`, or "system" for webhooks, jobs and scripts), when, and the old and new values (updates keep only the changed fields). Secrets (invite tokens, webhook keys) and call/text transcripts are left out. The table is append-only (a trigger refuses updates and deletes, even from the service role) and has no foreign key to businesses, so deleting a business keeps the record of what was deleted. Owners read their own business's history; platform admins read everything at **Admin > Change history** (filter by business, what, who).
+
 ### Team invites
 
 Owners invite from **Settings**. The invite is emailed (Resend) and the link is also shown, so the owner can share it another way if the email fails. The link opens `/invite/<token>`, which works signed in or out and explains wrong-account, expired, used and cancelled cases. Invites also appear on `/onboarding` for anyone signed in with the invited (verified) email.

@@ -13,6 +13,9 @@ import type { CallOutcome } from "@/lib/voice/agent-config";
 import { OUTCOME_LABELS } from "@/lib/voice/calls";
 import { OUTCOME_TONES, outcomeLabel, TRIGGER_LABELS } from "@/lib/voice/present";
 import { CallNowButton } from "../../calls/forms";
+import { BookVisitForm } from "../../calendar/forms";
+import { calendarContext } from "@/lib/calendar/service";
+import { openWindows } from "@/lib/calendar/slots";
 import { NotesForm, StatusForm } from "./forms";
 
 export const metadata: Metadata = { title: "Customer" };
@@ -62,7 +65,7 @@ export default async function CustomerPage({ params }: PageProps<"/leads/[id]">)
   if (!UUID.test(id)) notFound();
   const supabase = await createClient();
 
-  const [{ data: customer }, { data: leadRows }, { data: eventRows }, ctx, { data: callRows }, { data: voice }, { data: numbers }] = await Promise.all([
+  const [{ data: customer }, { data: leadRows }, { data: eventRows }, ctx, { data: callRows }, { data: voice }, { data: numbers }, { data: visitRows }, cal] = await Promise.all([
     supabase.from("customers").select("*").eq("id", id).eq("workspace_id", workspace.id).maybeSingle(),
     supabase.from("leads").select("*").eq("customer_id", id).order("received_at", { ascending: false }),
     supabase.from("events").select("id, type, subject_id, payload, actor_id, created_at").eq("customer_id", id)
@@ -80,6 +83,8 @@ export default async function CustomerPage({ params }: PageProps<"/leads/[id]">)
       .limit(10),
     supabase.from("voice_agents").select("retell_agent_id").eq("workspace_id", workspace.id).maybeSingle(),
     supabase.from("phone_numbers").select("e164").eq("workspace_id", workspace.id).limit(1),
+    supabase.from("appointments").select("id, starts_at, ends_at, status, address").eq("customer_id", id).order("starts_at", { ascending: false }).limit(10),
+    calendarContext(supabase, workspace.id),
   ]);
   if (!customer) notFound();
   const leads = (leadRows ?? []) as Lead[];
@@ -105,6 +110,14 @@ export default async function CustomerPage({ params }: PageProps<"/leads/[id]">)
   const latest = leads[0];
   const title = customer.full_name || formatPhone(customer.phone) || customer.email;
   const tz = workspace.timezone;
+  const visits = (visitRows ?? []) as { id: string; starts_at: string; ends_at: string; status: string; address: string | null }[];
+  const windowOptions = openWindows({ ...cal, now: new Date(), days: 10 }).map((w) => ({ value: `${w.date}|${w.start}|${w.end}`, label: w.label }));
+  const visitTime = (a: { starts_at: string; ends_at: string }) => {
+    const d = new Intl.DateTimeFormat("en-US", { timeZone: tz, weekday: "short", month: "short", day: "numeric" }).format(new Date(a.starts_at));
+    const t = (iso: string) => new Intl.DateTimeFormat("en-US", { timeZone: tz, hour: "numeric", minute: "2-digit" }).format(new Date(iso)).replace(":00", "").replace(" ", "").toLowerCase();
+    return `${d}, ${t(a.starts_at)} - ${t(a.ends_at)}`;
+  };
+  const VISIT_STATUS: Record<string, string> = { scheduled: "Booked", confirmed: "Confirmed", completed: "Done", no_show: "No-show", cancelled: "Cancelled" };
   const calls = (callRows ?? []) as { id: string; direction: string; trigger: string; status: string; outcome: CallOutcome | null; needs_review: boolean; duration_seconds: number | null; summary: string | null; created_at: string }[];
   const callBlocked = customer.do_not_call
     ? "This person asked not to be called."
@@ -169,6 +182,22 @@ export default async function CustomerPage({ params }: PageProps<"/leads/[id]">)
         return { title: "Replied by text", detail: [p.summary, p.preferred_window ? `Preferred: ${p.preferred_window}` : null].filter(Boolean).join(" · ") };
       case "sms.failed":
         return { title: "Text not sent", detail: p.reason?.startsWith("Retell") ? "The phone provider could not send the text." : p.reason };
+      case "appointment.booked":
+        return {
+          title: `Visit booked: ${p.starts_at && p.ends_at ? visitTime({ starts_at: p.starts_at, ends_at: p.ends_at }) : p.label}`,
+          detail: [p.address, p.source === "ai_call" ? "by the AI on a call" : p.source === "manual" && actorName(e.actor_id) ? `by ${actorName(e.actor_id)}` : null].filter(Boolean).join(" · "),
+        };
+      case "appointment.rescheduled":
+        return { title: `Visit moved to ${p.label}`, detail: actorName(e.actor_id) ? `by ${actorName(e.actor_id)}` : undefined };
+      case "appointment.confirmed":
+      case "appointment.completed":
+      case "appointment.no_show":
+      case "appointment.cancelled":
+      case "appointment.scheduled":
+        return {
+          title: { "appointment.confirmed": "Visit confirmed", "appointment.completed": "Visit done", "appointment.no_show": "No-show", "appointment.cancelled": "Visit cancelled", "appointment.scheduled": "Visit reopened" }[e.type]!,
+          detail: [p.reason, actorName(e.actor_id) ? `by ${actorName(e.actor_id)}` : null].filter(Boolean).join(" · ") || undefined,
+        };
       case "appointment.requested":
         return { title: `Visit requested: ${p.label}`, detail: [p.address, p.notes, "chosen on an AI call, team to confirm"].filter(Boolean).join(" · ") };
       case "customer.do_not_call":
@@ -208,6 +237,26 @@ export default async function CustomerPage({ params }: PageProps<"/leads/[id]">)
             <div className="mt-5 border-t border-slate-100 pt-4">
               <StatusForm customerId={customer.id} status={customer.status as CustomerStatus} />
             </div>
+          </Card>
+
+          <Card className="p-6">
+            <h2 className="mb-3 font-semibold text-slate-900">Visits</h2>
+            {visits.length ? (
+              <ul className="mb-4 divide-y divide-slate-100 text-sm">
+                {visits.map((v) => (
+                  <li key={v.id} className="flex items-start justify-between gap-3 py-2 first:pt-0">
+                    <Link href="/calendar" className="min-w-0 hover:text-brand-700">
+                      <span className="block font-medium text-slate-900">{visitTime(v)}</span>
+                      {v.address ? <span className="block text-xs text-slate-500">{v.address}</span> : null}
+                    </Link>
+                    <Badge tone={v.status === "confirmed" ? "green" : v.status === "cancelled" ? "red" : v.status === "scheduled" ? "blue" : "slate"}>{VISIT_STATUS[v.status] ?? v.status}</Badge>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="mb-4 text-sm text-slate-500">No visits booked yet.</p>
+            )}
+            <BookVisitForm customerId={customer.id} windows={windowOptions} />
           </Card>
 
           <Card className="p-6">
