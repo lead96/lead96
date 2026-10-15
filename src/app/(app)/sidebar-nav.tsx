@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useCallback, useRef, useState } from "react";
 import {
+  Activity,
   Building2,
   CalendarDays,
   ChevronDown,
@@ -61,6 +62,7 @@ export function SidebarContent({ showSetup, isAdmin, isOwner, workspaceName, rol
       label: "Business",
       items: [
         { href: "/profile", label: "Business profile", icon: Building2 },
+        { href: "/health", label: "Data health", icon: Activity },
         { href: "/integrations", label: "Integrations", icon: Plug },
         { href: "/settings", label: "Settings", icon: Settings },
       ],

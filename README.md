@@ -107,6 +107,12 @@ Lead96 has its own calendar (Google Calendar sync comes later). Visits are **arr
 - **Cost:** ad spend per platform for the same days (`ad_spend_daily`) goes on its channel: cost per lead and **cost per booking (CPQBA)** = spend / booked visits. Spend with no leads still shows. Spend is assumed to be in USD.
 - **Attribution views:** the table switches between Source, Campaign, Landing page, Ad and Keyword (`?by=`, kept together with the period). `attribution_report()` (migration 025) groups the same cohort (`cohort_funnel()`) by the first lead's campaign (campaign ID or utm_campaign), landing page, ad (ad ID or utm_content) or keyword (keyword or utm_term, lower-cased), per channel. Campaign spend is matched in `buildAttribution()` by campaign ID, or by name for leads that only carry utm_campaign; spend no lead matched gets its own row. Ads, keywords and landing pages show no spend (it is synced per campaign). Top 50 rows; the total counts all.
 
+### Data health (M5)
+
+`/health` (Business > Data health) shows 7 checks from `data_health()` with a drill-down list per check from `data_health_list()` (migration 027, run as the caller so RLS applies; definitions in `src/lib/health/checks.ts`): contacted without consent (AI calls out / texts to people with no consent on any lead - must stay 0), visits without a result, won without revenue, possible duplicates, answered AI calls without a transcript, ad / landing page / website leads without campaign data, and leads without consent (information only). Leads and calls count for the last 90 days; visits and won jobs at any age.
+
+**Duplicates:** `merge_customers(keep, merge)` moves leads, calls, visits, texts, call jobs and review items to the kept customer, fills its blanks, keeps the further status (won wins) and "do not call" if either had it, cancels the merged one's open call job and marks it `merged_into` (hidden from lists; its page redirects to the kept customer, whose timeline includes its events). `dismiss_duplicate()` records "different people". The merge asks to confirm first.
+
 ### Review queue (M5)
 
 `review_items` (migration 026) are filed by database triggers, never by hand:

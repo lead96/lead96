@@ -1,7 +1,7 @@
 import { ExternalLink } from "lucide-react";
 import Link from "next/link";
 import type { Metadata } from "next";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { Alert, Badge, Card, PageHeader } from "@/components/ui";
 import { requireWorkspace } from "@/lib/auth";
 import { formatDateTime, formatPhone } from "@/lib/format";
@@ -66,11 +66,16 @@ export default async function CustomerPage({ params }: PageProps<"/leads/[id]">)
   const { id } = await params;
   if (!UUID.test(id)) notFound();
   const supabase = await createClient();
+  // A merged customer lives on in the one it was merged into; its history shows there.
+  const { data: merged } = await supabase.from("customers").select("id, merged_into").or(`id.eq.${id},merged_into.eq.${id}`);
+  const self = (merged ?? []).find((c) => c.id === id);
+  if (self?.merged_into) redirect(`/leads/${self.merged_into}`);
+  const mergedIds = (merged ?? []).filter((c) => c.merged_into === id).map((c) => c.id);
 
   const [{ data: customer }, { data: leadRows }, { data: eventRows }, ctx, { data: callRows }, { data: voice }, { data: numbers }, { data: visitRows }, cal] = await Promise.all([
     supabase.from("customers").select("*").eq("id", id).eq("workspace_id", workspace.id).maybeSingle(),
     supabase.from("leads").select("*").eq("customer_id", id).order("received_at", { ascending: false }),
-    supabase.from("events").select("id, type, subject_id, payload, actor_id, created_at").eq("customer_id", id)
+    supabase.from("events").select("id, type, subject_id, payload, actor_id, created_at").in("customer_id", [id, ...mergedIds])
       // Events from one transaction share a timestamp; the id keeps them in the order they happened.
       .order("created_at", { ascending: false })
       .order("id", { ascending: false })
@@ -215,10 +220,17 @@ export default async function CustomerPage({ params }: PageProps<"/leads/[id]">)
         const verb = { approve: "approved", correct: "corrected", reject: "rejected", unsure: "set aside as not sure" }[p.action ?? ""] ?? "reviewed";
         return { title: `Review (${kind}): ${verb}`, detail: [p.reason, actorName(e.actor_id) ? `by ${actorName(e.actor_id)}` : null].filter(Boolean).join(" · ") || undefined };
       }
+      case "customer.merged":
+        return {
+          title: p.merged_customer_id ? `Merged with ${p.name ?? "a duplicate"}` : `Merged into ${p.name ?? "another customer"}`,
+          detail: actorName(e.actor_id) ? `by ${actorName(e.actor_id)}` : undefined,
+        };
+      case "customer.not_duplicate":
+        return { title: "Marked as a different person from a possible duplicate", detail: actorName(e.actor_id) ? `by ${actorName(e.actor_id)}` : undefined };
       case "customer.do_not_call":
         return { title: "Do not call", detail: p.reason };
       case "customer.possible_duplicate":
-        return { title: "Possible duplicate", detail: "This phone and email belong to two different customers. Check before merging." };
+        return { title: "Possible duplicate", detail: "This phone and email belong to two different customers. Merge them or mark them as different people under Data health." };
       default:
         return { title: e.type };
     }

@@ -729,6 +729,66 @@ describe.skipIf(!configured)("row-level security", () => {
     await admin.from("customers").delete().eq("id", id);
   }, 120_000);
 
+  it("data health: counts and lists per check; duplicates merged or dismissed; members only", async () => {
+    const since = new Date(Date.now() - 90 * 86_400_000).toISOString();
+    const health = async (c = staffA.client) => (await c.rpc("data_health", { p_workspace: wsA, p_since: since })).data as Record<string, number>;
+    const list = async (check: string) => (await staffA.client.rpc("data_health_list", { p_workspace: wsA, p_check: check, p_since: since })).data as Record<string, string>[];
+    const before = await health();
+    const tail = String(Date.now()).slice(-4);
+    const ingest = async (p: Record<string, unknown>) => {
+      const r = await admin.rpc("ingest_lead", { p: { workspace_id: wsA, kind: "form", fields: {}, ...p } });
+      expect(r.error).toBeNull();
+      return r.data.customer_id as string;
+    };
+    // Two customers, then a lead whose phone matches one and email the other -> possible duplicate.
+    const a = await ingest({ source: "landing_page", external_id: `dh-a-${run}`, full_name: "Ann Dup", phone: `+1214553${tail}`, consent_given: true, utm_source: "google", attribution_complete: true });
+    const b = await ingest({ source: "landing_page", external_id: `dh-b-${run}`, full_name: null, email: `ann-${run}@example.com` });
+    await ingest({ source: "landing_page", external_id: `dh-c-${run}`, phone: `+1214553${tail}`, email: `ann-${run}@example.com` });
+    let h = await health();
+    expect(h.duplicates).toBe(before.duplicates + 1);
+    expect(h.missing_source).toBe(before.missing_source + 2); // b and the third lead have no campaign data
+    expect(h.lead_no_consent).toBe(before.lead_no_consent + 2);
+    expect((await list("duplicates")).some((r) => [r.customer_id, r.other_customer_id].sort().join() === [a, b].sort().join())).toBe(true);
+
+    // An AI call to b (no consent on any lead) is flagged; won without revenue too.
+    await admin.from("calls").insert({ workspace_id: wsA, customer_id: b, provider_call_id: `dh-${run}`, direction: "outbound", trigger: "manual", status: "ended", duration_seconds: 40, outcome: "qualified" });
+    await admin.from("customers").update({ status: "won" }).eq("id", b);
+    h = await health();
+    expect(h.contact_no_consent).toBe(before.contact_no_consent + 1);
+    expect(h.missing_transcript).toBe(before.missing_transcript + 1);
+    expect(h.won_no_revenue).toBe(before.won_no_revenue + 1);
+    expect((await list("contact_no_consent")).find((r) => r.customer_id === b)?.detail).toBe("AI call");
+    expect((await staffA.client.rpc("data_health_list", { p_workspace: wsA, p_check: "nope", p_since: since })).error).not.toBeNull();
+    // Other businesses see zeros and empty lists.
+    expect(Object.values(await health(ownerB.client)).every((v) => v === 0)).toBe(true);
+    expect((await ownerB.client.rpc("data_health_list", { p_workspace: wsA, p_check: "duplicates", p_since: since })).data).toEqual([]);
+
+    // Merge b into a: everything moves, blanks filled, further status kept, b hidden; done once.
+    expect((await ownerB.client.rpc("merge_customers", { p_keep: a, p_merge: b })).error).not.toBeNull();
+    expect((await staffA.client.rpc("merge_customers", { p_keep: a, p_merge: b })).error).toBeNull();
+    const keep = (await admin.from("customers").select("full_name, email, phone, status, lead_count, merged_into").eq("id", a).single()).data!;
+    expect(keep).toMatchObject({ full_name: "Ann Dup", email: `ann-${run}@example.com`, status: "won", merged_into: null });
+    expect(keep.lead_count).toBe(3);
+    expect((await admin.from("customers").select("merged_into").eq("id", b).single()).data?.merged_into).toBe(a);
+    expect((await admin.from("leads").select("id").eq("customer_id", b)).data).toEqual([]);
+    expect((await admin.from("calls").select("customer_id").eq("provider_call_id", `dh-${run}`).single()).data?.customer_id).toBe(a);
+    expect((await health()).duplicates).toBe(before.duplicates);
+    expect((await health()).contact_no_consent).toBe(before.contact_no_consent); // a has consent
+    expect((await staffA.client.rpc("merge_customers", { p_keep: a, p_merge: b })).error?.message).toMatch(/already merged/);
+    // New leads with b's email now land on a.
+    expect(await ingest({ source: "manual", external_id: `dh-d-${run}`, email: `ann-${run}@example.com` })).toBe(a);
+
+    // "Different people" clears a pair without merging.
+    const x = await ingest({ source: "manual", external_id: `dh-x-${run}`, phone: `+1214552${tail}` });
+    const y = await ingest({ source: "manual", external_id: `dh-y-${run}`, email: `y-${run}@example.com` });
+    await ingest({ source: "manual", external_id: `dh-z-${run}`, phone: `+1214552${tail}`, email: `y-${run}@example.com` });
+    expect((await health()).duplicates).toBe(before.duplicates + 1);
+    expect((await staffA.client.rpc("dismiss_duplicate", { p_customer: y, p_other: x })).error).toBeNull();
+    expect((await health()).duplicates).toBe(before.duplicates);
+
+    await admin.from("calls").delete().eq("provider_call_id", `dh-${run}`);
+  }, 120_000);
+
   it("ZIP lookup: readable by any signed-in user, not writable, and finds real ZIPs", async () => {
     const miami = await ownerA.client.rpc("zip_city_matches", { p_city: "miami", p_state: "FL" });
     expect(miami.data).toHaveLength(1);
