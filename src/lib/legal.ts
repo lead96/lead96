@@ -13,8 +13,8 @@ export const COMPANY = {
   email: "admin@lead96.com",
   website: "lead96.com",
   registerCourt: "",
-  registerNumber: "",
-  vatId: "",
+  registerNumber: "HRB 187721",
+  vatId: "DE312845410",
 };
 
 export const LEGAL_UPDATED = "October 15, 2026";
