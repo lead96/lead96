@@ -62,7 +62,7 @@ Landing pages (`/landing-pages`) are template + JSON content (`src/lib/landing/c
 
 `/admin` is for platform admins (`profiles.is_platform_admin`, set in the database - users can't set it themselves). It shows a health card per integration built from `admin_integration_health()` (aggregates only) and the rules in `src/lib/admin/health.ts`, which credentials are set (names only, from env), a per-business table and the webhook delivery feed. **Run live checks** (`src/lib/admin/checks.ts`) calls each service with a free, read-only request. When Meta or Google lead sync ships, flip `BUILT` in `health.ts`.
 
-Agency-model credentials (server env, all optional until that integration is used): `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_ADS_DEVELOPER_TOKEN`, `GOOGLE_ADS_MANAGER_ID`, `GOOGLE_ADS_REFRESH_TOKEN`, `META_APP_ID`, `META_APP_SECRET`, `META_SYSTEM_USER_TOKEN`, `META_BUSINESS_ID`.
+Google Ads API access (since v25): the access level (Test / Explorer / Basic) belongs to the **Google Cloud project that owns the OAuth client** (`GOOGLE_CLIENT_ID` starts with its project number), not to the developer token; apply on that project's Google Ads API page in Cloud Console. Agency-model credentials (server env, all optional until that integration is used): `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_ADS_DEVELOPER_TOKEN`, `GOOGLE_ADS_MANAGER_ID`, `GOOGLE_ADS_REFRESH_TOKEN`, `META_APP_ID`, `META_APP_SECRET`, `META_SYSTEM_USER_TOKEN`, `META_BUSINESS_ID`.
 
 ### Google Ads (M2)
 

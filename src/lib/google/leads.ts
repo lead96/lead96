@@ -171,8 +171,11 @@ export function googleAdsError(body: unknown, status: number): { code: string; m
 const FRIENDLY: Record<string, string> = {
   DEVELOPER_TOKEN_NOT_APPROVED:
     "The developer token only has Test access, so it can't read real accounts. Use a test manager account, or apply for Basic access in API Center.",
+  // Since v25 (developer tokens sunset Sept 2026) the access level belongs to the Google Cloud project
+  // that owns the OAuth client (GOOGLE_CLIENT_ID starts with its project number), not to the token.
   CLOUD_PROJECT_NOT_APPROVED_FOR_PRODUCTION:
-    "Google Ads API access is still at Test level, so only test accounts can be read. Use a test manager account for now, or apply for Explorer/Basic access in API Center.",
+    "The Google Cloud project behind the Lead96 sign-in is still at Test access, so only test accounts can be read. In Google Cloud Console open that project (its number is the start of GOOGLE_CLIENT_ID), go to APIs & Services > Google Ads API and apply for Explorer or Basic access there.",
+  UNAUTHENTICATED: "Google did not accept the stored sign-in. Reconnect Google Ads.",
   DEVELOPER_TOKEN_PROHIBITED: "This developer token can't be used with this Google Cloud project.",
   USER_PERMISSION_DENIED: "The connected Google user has no access to this account through the manager account.",
   CUSTOMER_NOT_ENABLED: "This Google Ads account isn't active (cancelled or never finished setup).",

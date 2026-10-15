@@ -135,14 +135,17 @@ export async function disconnect() {
   accessToken = null;
 }
 
-let accessToken: { token: string; expires: number } | null = null;
+// Cached per stored sign-in: each server process (and each route bundle) has its own copy, so the
+// cache is tied to the connection it came from. A reconnect elsewhere changes connected_at and the
+// old token (revoked by Google on disconnect) is never used again.
+let accessToken: { token: string; expires: number; connection: string } | null = null;
 
 async function getAccessToken(): Promise<string> {
-  if (accessToken && accessToken.expires > Date.now() + 60_000) return accessToken.token;
   const c = googleConfig();
   if (c.missing.length) throw new GoogleAdsError("NOT_CONFIGURED", `Missing: ${c.missing.join(", ")}`);
-  const { data } = await createAdminClient().from("platform_connections").select("secret_ciphertext").eq("provider", "google_ads").maybeSingle();
+  const { data } = await createAdminClient().from("platform_connections").select("secret_ciphertext, connected_at").eq("provider", "google_ads").maybeSingle();
   if (!data) throw new GoogleAdsError("NOT_CONNECTED", "Google Ads isn't connected yet.");
+  if (accessToken && accessToken.connection === data.connected_at && accessToken.expires > Date.now() + 60_000) return accessToken.token;
   const res = await fetch("https://oauth2.googleapis.com/token", {
     method: "POST",
     headers: { "content-type": "application/x-www-form-urlencoded" },
@@ -163,7 +166,7 @@ async function getAccessToken(): Promise<string> {
     await recordConnectionResult(e.message);
     throw e;
   }
-  accessToken = { token: body.access_token, expires: Date.now() + (body.expires_in ?? 3600) * 1000 };
+  accessToken = { token: body.access_token, expires: Date.now() + (body.expires_in ?? 3600) * 1000, connection: data.connected_at };
   return accessToken.token;
 }
 
@@ -182,10 +185,11 @@ async function recordConnectionResult(error: string | null) {
 /** Runs a GAQL query against one account (through the manager account) and returns all rows. */
 export async function search<T>(customerId: string, query: string): Promise<T[]> {
   const c = googleConfig();
-  const token = await getAccessToken();
+  let token = await getAccessToken();
+  let retried = false;
   const rows: T[] = [];
   let pageToken: string | undefined;
-  do {
+  for (;;) {
     const res = await fetch(`https://googleads.googleapis.com/${c.apiVersion}/customers/${digits(customerId)}/googleAds:search`, {
       method: "POST",
       headers: {
@@ -198,6 +202,13 @@ export async function search<T>(customerId: string, query: string): Promise<T[]>
       signal: AbortSignal.timeout(TIMEOUT_MS),
     });
     const body = (await res.json().catch(() => ({}))) as { results?: T[]; nextPageToken?: string };
+    if (res.status === 401 && !retried) {
+      // A token Google no longer accepts (revoked, or cached from an older sign-in): get a fresh one once.
+      retried = true;
+      accessToken = null;
+      token = await getAccessToken();
+      continue;
+    }
     if (!res.ok) {
       const e = googleAdsError(body, res.status);
       const err = new GoogleAdsError(e.code, friendlyGoogleError(e));
@@ -206,7 +217,8 @@ export async function search<T>(customerId: string, query: string): Promise<T[]>
     }
     rows.push(...(body.results ?? []));
     pageToken = body.nextPageToken;
-  } while (pageToken);
+    if (!pageToken) break;
+  }
   await recordConnectionResult(null);
   return rows;
 }
