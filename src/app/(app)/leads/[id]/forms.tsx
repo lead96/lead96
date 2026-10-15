@@ -1,20 +1,65 @@
 "use client";
 
-import { useActionState } from "react";
+import { startTransition, useActionState, useState } from "react";
 import { Alert, Button, Input, Select } from "@/components/ui";
 import { CUSTOMER_STATUSES, STATUS_LABELS, type CustomerStatus } from "@/lib/leads/normalize";
+import { outcomeNeeds } from "@/lib/leads/outcomes";
 import { changeStatus, saveNotes } from "../actions";
 
-export function StatusForm({ customerId, status }: { customerId: string; status: CustomerStatus }) {
-  const [state, action, pending] = useActionState(changeStatus, undefined);
+export function StatusForm({
+  customerId,
+  status,
+  reasonCode,
+  amount,
+  compact = false,
+}: {
+  customerId: string;
+  status: CustomerStatus;
+  reasonCode?: string | null;
+  amount?: number | null;
+  compact?: boolean;
+}) {
+  // Controlled: the reason and amount fields follow the chosen status.
+  const [value, setValue] = useState<CustomerStatus>(status);
+  const [reason, setReason] = useState(reasonCode ?? "");
+  const [sum, setSum] = useState(amount ? String(amount) : "");
+  const [note, setNote] = useState("");
+  const [state, action, pending] = useActionState(async (prev: Awaited<ReturnType<typeof changeStatus>>, fd: FormData) => {
+    const r = await changeStatus(prev, fd);
+    if (r?.message) setNote("");
+    return r;
+  }, undefined);
+  const needs = outcomeNeeds(value);
+  const id = (k: string) => `${k}-${customerId}`;
   return (
-    <form action={action} className="space-y-2">
+    <form
+      // Submitted by hand (not via the action prop) so React doesn't reset the form: after a refused
+      // save the dropdowns must still show what was chosen.
+      onSubmit={(e) => {
+        e.preventDefault();
+        const fd = new FormData(e.currentTarget);
+        startTransition(() => action(fd));
+      }}
+      className="space-y-2"
+    >
       <input type="hidden" name="customer_id" value={customerId} />
-      <label htmlFor="status" className="block text-sm font-medium text-slate-700">
-        Change status
-      </label>
+      {compact ? null : (
+        <label htmlFor={id("status")} className="block text-sm font-medium text-slate-700">
+          Status and result
+        </label>
+      )}
       <div className="flex gap-2">
-        <Select id="status" name="status" defaultValue={status} key={status} className="flex-1">
+        <Select
+          id={id("status")}
+          name="status"
+          value={value}
+          onChange={(e) => {
+            setValue(e.target.value as CustomerStatus);
+            setReason("");
+          }}
+          className="flex-1"
+          aria-label="Status"
+        >
           {CUSTOMER_STATUSES.map((s) => (
             <option key={s} value={s}>
               {STATUS_LABELS[s]}
@@ -22,10 +67,31 @@ export function StatusForm({ customerId, status }: { customerId: string; status:
           ))}
         </Select>
         <Button type="submit" variant="secondary" disabled={pending}>
-          {pending ? "..." : "Update"}
+          {pending ? "..." : "Save"}
         </Button>
       </div>
-      <Input name="reason" placeholder="Reason (optional), e.g. 'left voicemail'" maxLength={300} aria-label="Reason" />
+      {needs.reason ? (
+        <Select name="reason_code" value={reason} onChange={(e) => setReason(e.target.value)} aria-label="Reason" required>
+          <option value="">{value === "lost" ? "Why was it lost?" : "Why not qualified?"}</option>
+          {Object.entries(needs.reason).map(([k, label]) => (
+            <option key={k} value={k}>
+              {label}
+            </option>
+          ))}
+        </Select>
+      ) : null}
+      {needs.amount ? (
+        <Input
+          name="amount"
+          value={sum}
+          onChange={(e) => setSum(e.target.value)}
+          inputMode="decimal"
+          placeholder={needs.amount === "revenue" ? "Revenue in $, e.g. 4500" : "Estimate in $, e.g. 4500"}
+          aria-label={needs.amount === "revenue" ? "Revenue" : "Estimate"}
+          required
+        />
+      ) : null}
+      <Input name="reason" value={note} onChange={(e) => setNote(e.target.value)} placeholder="Note (optional), e.g. 'went with a cheaper quote'" maxLength={300} aria-label="Note" />
       {state?.error ? <Alert tone="error">{state.error}</Alert> : null}
       {state?.message ? <Alert tone="success">{state.message}</Alert> : null}
     </form>

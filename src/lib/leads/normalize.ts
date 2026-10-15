@@ -17,12 +17,13 @@ export const SOURCE_LABELS: Record<LeadSource, string> = {
   website: "Website",
 };
 
-export const CUSTOMER_STATUSES = ["new", "contacted", "qualified", "appointment", "showed", "estimate", "won", "lost"] as const;
+export const CUSTOMER_STATUSES = ["new", "contacted", "qualified", "not_qualified", "appointment", "showed", "estimate", "won", "lost"] as const;
 export type CustomerStatus = (typeof CUSTOMER_STATUSES)[number];
 export const STATUS_LABELS: Record<CustomerStatus, string> = {
   new: "New",
   contacted: "Contacted",
   qualified: "Qualified",
+  not_qualified: "Not qualified",
   appointment: "Appointment",
   showed: "Showed",
   estimate: "Estimate",
@@ -35,6 +36,7 @@ export const STATUS_TONES: Record<CustomerStatus, "slate" | "blue" | "green"> = 
   new: "blue",
   contacted: "slate",
   qualified: "blue",
+  not_qualified: "slate",
   appointment: "blue",
   showed: "blue",
   estimate: "blue",

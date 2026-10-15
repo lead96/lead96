@@ -99,3 +99,24 @@ export function teamBookingEmail(p: { business: string; customer: string; phone:
   const text = [`New visit booked for ${p.business}`, "", p.when, ...details, "", p.bookedBy, "", `Open calendar: ${p.url}`].join("\n");
   return { subject, html, text };
 }
+
+/** To the business owners on weekday mornings while past visits or finished jobs have no result. */
+export function pendingOutcomesEmail(p: { business: string; visits: number; jobs: number; examples: string[]; url: string }) {
+  const parts = [
+    p.visits ? `${p.visits} past visit${p.visits === 1 ? "" : "s"} still marked as booked` : null,
+    p.jobs ? `${p.jobs} finished job${p.jobs === 1 ? "" : "s"} without won / lost` : null,
+  ].filter(Boolean) as string[];
+  const total = p.visits + p.jobs;
+  const subject = `${p.business}: ${total} visit result${total === 1 ? "" : "s"} to record`;
+  const html = [
+    `<h2>Visit results to record</h2>`,
+    `<p>${parts.map(esc).join("<br>")}</p>`,
+    p.examples.length ? `<p style="${NOTE}">${p.examples.map(esc).join("<br>")}</p>` : "",
+    `<p>It takes a few seconds per visit, and it is what shows which ads bring paying jobs.</p>`,
+    `<p><a href="${esc(p.url)}" style="${BUTTON}">Record results</a></p>`,
+  ]
+    .filter(Boolean)
+    .join("\n");
+  const text = [`Visit results to record for ${p.business}`, "", ...parts, ...(p.examples.length ? ["", ...p.examples] : []), "", `Record results: ${p.url}`].join("\n");
+  return { subject, html, text };
+}

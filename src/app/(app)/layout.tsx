@@ -2,6 +2,7 @@ import Link from "next/link";
 import { ListChecks } from "lucide-react";
 import { Logo } from "@/components/logo";
 import { getProfile, requireWorkspace } from "@/lib/auth";
+import { createClient } from "@/lib/supabase/server";
 import { MobileNav } from "./mobile-nav";
 import { ProfileMenu } from "./profile-menu";
 import { SidebarContent } from "./sidebar-nav";
@@ -9,12 +10,14 @@ import { TopSearch } from "./top-search";
 
 export default async function AppLayout({ children }: LayoutProps<"/">) {
   const [workspace, profile] = await Promise.all([requireWorkspace(), getProfile()]);
+  const { data: pending } = await (await createClient()).rpc("pending_outcome_counts", { p_workspace: workspace.id }).maybeSingle<{ visits: number; jobs: number }>();
   const nav = {
     showSetup: workspace.role === "owner" && !workspace.setupCompletedAt,
     isAdmin: Boolean(profile?.is_platform_admin),
     isOwner: workspace.role === "owner",
     workspaceName: workspace.name,
     role: workspace.role,
+    pendingOutcomes: (pending?.visits ?? 0) + (pending?.jobs ?? 0),
   };
   const email = profile?.email ?? "";
   const name = profile?.full_name?.trim() || email.split("@")[0] || "Account";

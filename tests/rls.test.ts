@@ -522,6 +522,68 @@ describe.skipIf(!configured)("row-level security", () => {
     }
   }, 120_000);
 
+  it("outcomes: members record results with the rules enforced, pending visits are counted, one reminder a day", async () => {
+    const cust = await admin.from("customers").insert({ workspace_id: wsA, full_name: "Outcome Test", phone: `+1214557${String(Date.now()).slice(-4)}` }).select("id").single();
+    const id = cust.data!.id;
+    const set = (c: typeof staffA.client, status: string, reason: string | null, amount: number | null, note: string | null = null) =>
+      c.rpc("set_outcome", { p_customer: id, p_status: status, p_reason: reason, p_amount: amount, p_note: note });
+    // The rules hold in the database, not only in the form.
+    expect((await set(staffA.client, "won", null, null)).error?.message).toMatch(/amount_required/);
+    expect((await set(staffA.client, "lost", null, null)).error?.message).toMatch(/reason_required/);
+    expect((await set(staffA.client, "lost", "outside_area", null)).error?.message).toMatch(/reason_required/); // a not-qualified reason
+    expect((await set(staffA.client, "maybe", null, null)).error?.message).toMatch(/invalid_status/);
+    expect((await set(ownerB.client, "won", null, 100)).error).not.toBeNull();
+    // Customers can't be edited directly.
+    await ownerA.client.from("customers").update({ revenue: 1 }).eq("id", id);
+    expect((await admin.from("customers").select("revenue").eq("id", id).single()).data?.revenue).toBeNull();
+
+    expect((await set(staffA.client, "estimate", null, 4200, "quote sent")).data).toBe(true);
+    expect((await set(staffA.client, "won", null, 4500.555)).data).toBe(true);
+    let c: Record<string, unknown> = (await admin.from("customers").select("status, revenue, estimate_amount, closed_at").eq("id", id).single()).data!;
+    expect(c).toMatchObject({ status: "won", revenue: 4500.56, estimate_amount: 4200 });
+    const closed = c.closed_at;
+    expect(closed).not.toBeNull();
+    expect((await set(staffA.client, "won", null, 4500.56)).data).toBe(false); // nothing changed
+    expect((await set(ownerA.client, "won", null, 4800, "extra part")).data).toBe(true); // correction keeps the close date
+    c = (await admin.from("customers").select("status, revenue, closed_at").eq("id", id).single()).data!;
+    expect(c.revenue).toBe(4800);
+    expect(c.closed_at).toBe(closed);
+    expect((await set(ownerA.client, "lost", "competitor", null)).data).toBe(true);
+    c = (await admin.from("customers").select("status, revenue, lost_reason").eq("id", id).single()).data!;
+    expect(c).toMatchObject({ status: "lost", revenue: null, lost_reason: "competitor" });
+    const ev = (await admin.from("events").select("actor_id, payload").eq("customer_id", id).eq("type", "customer.status_changed").order("id")).data!;
+    expect(ev.map((e) => e.payload.to)).toEqual(["estimate", "won", "won", "lost"]);
+    expect(ev[0]).toMatchObject({ actor_id: staffA.id, payload: { from: "new", amount: 4200, reason: "quote sent" } });
+    expect(ev[3].payload).toMatchObject({ reason_code: "competitor" });
+
+    // Pending: a past visit still booked, and a done visit without a final result.
+    const day = (d: number) => new Date(Date.now() - d * 86_400_000).toISOString().slice(0, 10);
+    const cust2 = await admin.from("customers").insert({ workspace_id: wsA, full_name: "Pending Test", phone: `+1214558${String(Date.now()).slice(-4)}` }).select("id").single();
+    const past = await admin.from("appointments").insert([
+      { workspace_id: wsA, customer_id: cust2.data!.id, starts_at: `${day(3)}T13:00:00Z`, ends_at: `${day(3)}T17:00:00Z`, source: "manual", status: "scheduled" },
+      { workspace_id: wsA, customer_id: id, starts_at: `${day(2)}T13:00:00Z`, ends_at: `${day(2)}T17:00:00Z`, source: "manual", status: "completed" },
+    ]).select("id");
+    expect(past.error).toBeNull();
+    const counts = async (cl: typeof staffA.client) => (await cl.rpc("pending_outcome_counts", { p_workspace: wsA }).single()).data as { visits: number; jobs: number };
+    expect(await counts(staffA.client)).toMatchObject({ visits: 1, jobs: 0 }); // the done visit's customer is lost: final
+    expect((await set(ownerA.client, "showed", null, null)).data).toBe(true);
+    expect(await counts(staffA.client)).toMatchObject({ visits: 1, jobs: 1 });
+    expect(await counts(ownerB.client)).toMatchObject({ visits: 0, jobs: 0 }); // another business sees nothing
+
+    // Reminder: planned once per day for a business with something pending; never by users.
+    // Scoped to this business, so the test never queues reminders for real ones.
+    expect((await ownerA.client.rpc("plan_outcome_reminders", { p_workspace: wsA })).error).not.toBeNull();
+    expect((await admin.rpc("plan_outcome_reminders", { p_workspace: wsA })).data).toBe(1);
+    expect((await admin.rpc("plan_outcome_reminders", { p_workspace: wsA })).data).toBe(0);
+    const reminders = (await admin.from("notification_jobs").select("kind, appointment_id").eq("workspace_id", wsA).eq("kind", "pending_outcomes")).data!;
+    expect(reminders).toEqual([{ kind: "pending_outcomes", appointment_id: null }]);
+    // A visit message can't be filed without its visit (and the reverse).
+    expect((await admin.from("notification_jobs").insert({ workspace_id: wsA, kind: "confirmation" })).error).not.toBeNull();
+
+    await admin.from("notification_jobs").delete().eq("workspace_id", wsA);
+    await admin.from("appointments").delete().eq("workspace_id", wsA);
+  }, 120_000);
+
   it("ZIP lookup: readable by any signed-in user, not writable, and finds real ZIPs", async () => {
     const miami = await ownerA.client.rpc("zip_city_matches", { p_city: "miami", p_state: "FL" });
     expect(miami.data).toHaveLength(1);

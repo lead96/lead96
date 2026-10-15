@@ -16,6 +16,7 @@ import { CallNowButton } from "../../calls/forms";
 import { BookVisitForm } from "../../calendar/forms";
 import { calendarContext } from "@/lib/calendar/service";
 import { openWindows } from "@/lib/calendar/slots";
+import { money, reasonLabel } from "@/lib/leads/outcomes";
 import { NotesForm, StatusForm } from "./forms";
 
 export const metadata: Metadata = { title: "Customer" };
@@ -154,11 +155,14 @@ export default async function CustomerPage({ params }: PageProps<"/leads/[id]">)
       }
       case "customer.created":
         return { title: "Customer created" };
-      case "customer.status_changed":
+      case "customer.status_changed": {
+        const to = STATUS_LABELS[p.to as CustomerStatus] ?? p.to;
+        const amount = p.amount !== undefined ? `${p.to === "won" ? "revenue" : "estimate"} ${money(p.amount)}` : null;
         return {
-          title: `Status changed from ${STATUS_LABELS[p.from as CustomerStatus] ?? p.from} to ${STATUS_LABELS[p.to as CustomerStatus] ?? p.to}`,
-          detail: [p.reason, actorName(e.actor_id) ? `by ${actorName(e.actor_id)}` : null].filter(Boolean).join(" · "),
+          title: p.from === p.to ? `${to}: result updated` : `Status changed from ${STATUS_LABELS[p.from as CustomerStatus] ?? p.from} to ${to}`,
+          detail: [amount, reasonLabel(p.reason_code), p.reason, actorName(e.actor_id) ? `by ${actorName(e.actor_id)}` : null].filter(Boolean).join(" · "),
         };
+      }
       case "customer.notes_updated":
         return { title: "Notes updated", detail: actorName(e.actor_id) ? `by ${actorName(e.actor_id)}` : undefined };
       case "call.completed":
@@ -238,9 +242,19 @@ export default async function CustomerPage({ params }: PageProps<"/leads/[id]">)
               <Row label="Leads">{customer.lead_count}</Row>
               <Row label="First contact">{customer.first_lead_at ? formatDateTime(customer.first_lead_at, tz) : "-"}</Row>
               {customer.do_not_call ? <Row label="Calls"><Badge tone="amber">Do not call</Badge></Row> : null}
+              {customer.estimate_amount !== null ? <Row label="Estimate">{money(customer.estimate_amount)}</Row> : null}
+              {customer.status === "won" ? <Row label="Revenue">{money(customer.revenue)}</Row> : null}
+              {customer.lost_reason || customer.not_qualified_reason ? <Row label="Reason">{reasonLabel(customer.lost_reason ?? customer.not_qualified_reason)}</Row> : null}
             </dl>
             <div className="mt-5 border-t border-slate-100 pt-4">
-              <StatusForm customerId={customer.id} status={customer.status as CustomerStatus} />
+              <StatusForm
+                // Re-created when the status changes elsewhere (booking, visit done), so it never shows a stale one.
+                key={customer.status}
+                customerId={customer.id}
+                status={customer.status as CustomerStatus}
+                reasonCode={customer.lost_reason ?? customer.not_qualified_reason}
+                amount={customer.status === "won" ? customer.revenue : customer.estimate_amount}
+              />
             </div>
           </Card>
 

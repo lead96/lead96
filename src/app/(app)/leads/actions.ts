@@ -8,6 +8,7 @@ import { getUser, requireWorkspace } from "@/lib/auth";
 import { IMPORT_CHUNK, matchService } from "@/lib/leads/csv";
 import { ingestLead, ingestLeads } from "@/lib/leads/ingest";
 import { CUSTOMER_STATUSES, type CustomerStatus, type RawLead } from "@/lib/leads/normalize";
+import { outcomeNeeds, parseAmount } from "@/lib/leads/outcomes";
 import { loadSetupContext } from "@/lib/setup/service";
 import { createAdminClient, createClient } from "@/lib/supabase/server";
 
@@ -35,21 +36,32 @@ export async function addManualLead(_: LeadFormState, formData: FormData): Promi
   redirect(`/leads/${result.customerId}`);
 }
 
+/** Records the customer's status / job result (amount and reason when the status needs them). */
 export async function changeStatus(_: LeadFormState, formData: FormData): Promise<LeadFormState> {
   await requireWorkspace();
   const customerId = text(formData, "customer_id");
   const status = text(formData, "status") as CustomerStatus;
   if (!CUSTOMER_STATUSES.includes(status)) return { error: "Unknown status." };
+  const needs = outcomeNeeds(status);
+  const reason = text(formData, "reason_code");
+  if (needs.reason && !(reason in needs.reason)) return { error: status === "lost" ? "Choose why the job was lost." : "Choose why this lead is not qualified." };
+  let amount: number | null = null;
+  if (needs.amount) {
+    amount = parseAmount(text(formData, "amount"));
+    if (amount === null) return { error: needs.amount === "revenue" ? "Enter the job's revenue in dollars, like 4500." : "Enter the estimate in dollars, like 4500." };
+  }
   const supabase = await createClient();
-  const { error } = await supabase.rpc("set_customer_status", {
+  const { data: changed, error } = await supabase.rpc("set_outcome", {
     p_customer: customerId,
     p_status: status,
-    p_reason: text(formData, "reason").slice(0, 300) || null,
+    p_reason: needs.reason ? reason : null,
+    p_amount: amount,
+    p_note: text(formData, "reason").slice(0, 300) || null,
   });
   if (error) return { error: "Could not update the status." };
-  revalidatePath(`/leads/${customerId}`);
-  revalidatePath("/leads");
-  return { message: "Status updated." };
+  // Layout: the Outcomes count in the menu changes with it.
+  revalidatePath("/", "layout");
+  return { message: changed ? "Saved." : "Nothing changed." };
 }
 
 export async function saveNotes(_: LeadFormState, formData: FormData): Promise<LeadFormState> {

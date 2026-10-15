@@ -27,7 +27,8 @@ export async function setAppointmentStatus(_: CalendarState, formData: FormData)
     p_reason: String(formData.get("reason") ?? "").trim().slice(0, 300) || null,
   });
   if (error) return { error: "Could not save. Please try again." };
-  revalidatePath("/calendar");
+  // Layout too: the Outcomes count in the menu changes with it.
+  revalidatePath("/", "layout");
   return { message: { confirmed: "Confirmed.", completed: "Marked as done.", no_show: "Marked as no-show.", cancelled: "Cancelled.", scheduled: "Saved." }[status] ?? "Saved." };
 }
 

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { isUndeliverableAddress } from "@/lib/email/address";
-import { inviteEmail, teamBookingEmail, visitEmail } from "@/lib/email/templates";
+import { inviteEmail, pendingOutcomesEmail, teamBookingEmail, visitEmail } from "@/lib/email/templates";
 
 describe("invite email", () => {
   const url = "https://lead96.com/invite/abc123";
@@ -79,5 +79,22 @@ describe("visit emails", () => {
     expect(e.subject).toBe("New visit booked: Maria Lopez, Thu Oct 15, 8am - 12pm");
     expect(e.text).toContain("(214) 555-0142");
     expect(e.html).toContain('href="https://lead96.com/calendar"');
+  });
+});
+
+describe("pending outcomes email", () => {
+  it("counts what is open, lists examples and links the Outcomes page", () => {
+    const e = pendingOutcomesEmail({ business: "Cool <Air>", visits: 2, jobs: 1, examples: ["Maria Lopez: Thu Oct 15, 8am - 12pm"], url: "https://lead96.com/outcomes" });
+    expect(e.subject).toBe("Cool <Air>: 3 visit results to record");
+    expect(e.text).toContain("2 past visits still marked as booked");
+    expect(e.text).toContain("1 finished job without won / lost");
+    expect(e.html).toContain("Maria Lopez: Thu Oct 15");
+    expect(e.html).not.toContain("<Air>");
+    expect(e.html).toContain('href="https://lead96.com/outcomes"');
+  });
+  it("leaves out an empty group", () => {
+    const e = pendingOutcomesEmail({ business: "B", visits: 0, jobs: 1, examples: [], url: "https://lead96.com/outcomes" });
+    expect(e.subject).toBe("B: 1 visit result to record");
+    expect(e.text).not.toContain("past visit");
   });
 });

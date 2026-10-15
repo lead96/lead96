@@ -1,16 +1,23 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { startTransition, useActionState, useState } from "react";
 import { Alert, Button, Input, Select } from "@/components/ui";
 import { setTextingStatusAction } from "./actions";
 
 export function TextingStatusForm({ workspaceId, status, note }: { workspaceId: string; status: string; note: string | null }) {
   const [state, action, pending] = useActionState(setTextingStatusAction, undefined);
-  // Controlled, so a refused save (e.g. no note) keeps what the admin chose.
   const [value, setValue] = useState(status === "submitted" ? "in_review" : status);
   const [text, setText] = useState(note ?? "");
   return (
-    <form action={action} className="space-y-3">
+    <form
+      // Submitted by hand so React doesn't reset the form: a refused save keeps the chosen status.
+      onSubmit={(e) => {
+        e.preventDefault();
+        const fd = new FormData(e.currentTarget);
+        startTransition(() => action(fd));
+      }}
+      className="space-y-3"
+    >
       <input type="hidden" name="workspace_id" value={workspaceId} />
       {state?.error ? <Alert tone="error">{state.error}</Alert> : null}
       {state?.message ? <Alert tone="success">{state.message}</Alert> : null}
