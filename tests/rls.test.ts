@@ -789,6 +789,30 @@ describe.skipIf(!configured)("row-level security", () => {
     await admin.from("calls").delete().eq("provider_call_id", `dh-${run}`);
   }, 120_000);
 
+  it("admin overview and failure feed: platform admins only, numbers per business", async () => {
+    expect((await ownerA.client.rpc("admin_business_overview")).error).not.toBeNull();
+    expect((await staffA.client.rpc("admin_error_feed", { p_limit: 10 })).error).not.toBeNull();
+    const cust = await admin.from("customers").insert({ workspace_id: wsA, full_name: "Admin View", phone: `+1214550${String(Date.now()).slice(-4)}` }).select("id").single();
+    const job = await admin.from("call_jobs").insert({ workspace_id: wsA, customer_id: cust.data!.id, trigger: "manual", status: "failed", reason: `test failure ${run}` }).select("id").single();
+    expect(job.error).toBeNull();
+    const platform = await makeUser(admin, "platform-overview");
+    try {
+      await admin.from("profiles").update({ is_platform_admin: true }).eq("id", platform.id);
+      const { data, error } = await platform.client.rpc("admin_business_overview");
+      expect(error).toBeNull();
+      const a = (data as { id: string }[]).find((w) => w.id === wsA) as Record<string, unknown>;
+      expect(a).toMatchObject({ name: `A ${run}`, owners: ownerA.email, members: 2 });
+      expect(Number(a.errors_7d)).toBeGreaterThanOrEqual(1);
+      expect((data as { id: string }[]).some((w) => w.id === wsB)).toBe(true);
+      const feed = (await platform.client.rpc("admin_error_feed", { p_limit: 500 })).data as { kind: string; ref: string; message: string; workspace_id: string }[];
+      expect(feed.find((f) => f.ref === job.data!.id)).toMatchObject({ kind: "call_job", workspace_id: wsA, message: `test failure ${run}` });
+    } finally {
+      await admin.auth.admin.deleteUser(platform.id);
+      await admin.from("call_jobs").delete().eq("id", job.data!.id);
+      await admin.from("customers").delete().eq("id", cust.data!.id);
+    }
+  }, 120_000);
+
   it("ZIP lookup: readable by any signed-in user, not writable, and finds real ZIPs", async () => {
     const miami = await ownerA.client.rpc("zip_city_matches", { p_city: "miami", p_state: "FL" });
     expect(miami.data).toHaveLength(1);
