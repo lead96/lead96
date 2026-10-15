@@ -584,6 +584,151 @@ describe.skipIf(!configured)("row-level security", () => {
     await admin.from("appointments").delete().eq("workspace_id", wsA);
   }, 120_000);
 
+  it("dashboard and attribution reports: cohort by first-touch channel / campaign / keyword, stages reached, spend; only members see them", async () => {
+    // A fixed past week no other test writes to.
+    const day = "2025-03-0";
+    let n = 0;
+    const lead = async (p: Record<string, unknown>, d: number) => {
+      n += 1;
+      const r = await admin.rpc("ingest_lead", {
+        p: { workspace_id: wsA, kind: "form", external_id: `dash-${run}-${n}`, phone: `+1214559${String(1000 + n)}`, fields: {}, received_at: `${day}${d}T15:00:00Z`, ...p },
+      });
+      expect(r.error).toBeNull();
+      return r.data.customer_id as string;
+    };
+    const g1 = await lead({ source: "landing_page", gclid: "G1" }, 2); // landing page + Google click = Google Ads
+    const g2 = await lead({ source: "google" }, 3);
+    const m1 = await lead({ source: "landing_page", utm_source: "facebook" }, 3);
+    const lp = await lead({ source: "landing_page" }, 4);
+    const call = await lead({ source: "call", kind: "call" }, 5);
+    // The same person later comes from another channel: first touch counts.
+    await lead({ source: "meta", phone: `+1214559${String(1001)}` }, 6);
+
+    await admin.rpc("set_outcome", { p_customer: g1, p_status: "won", p_reason: null, p_amount: 5000, p_note: null });
+    await admin.from("appointments").insert([
+      { workspace_id: wsA, customer_id: g1, starts_at: `${day}4T13:00:00Z`, ends_at: `${day}4T17:00:00Z`, source: "manual", status: "completed" },
+      { workspace_id: wsA, customer_id: g2, starts_at: `${day}5T13:00:00Z`, ends_at: `${day}5T17:00:00Z`, source: "manual", status: "cancelled" },
+      { workspace_id: wsA, customer_id: m1, starts_at: `${day}6T13:00:00Z`, ends_at: `${day}6T17:00:00Z`, source: "manual", status: "no_show" },
+    ]);
+    await admin.rpc("set_outcome", { p_customer: g2, p_status: "not_qualified", p_reason: "outside_area", p_amount: null, p_note: null });
+    await admin.rpc("set_outcome", { p_customer: lp, p_status: "lost", p_reason: "price", p_amount: null, p_note: null });
+    await admin.from("ad_spend_daily").insert([
+      { workspace_id: wsA, platform: "google", account_external_id: `acc-${run}`, campaign_id: "c1", date: `${day}2`, cost: 120.5, clicks: 30 },
+      { workspace_id: wsA, platform: "google", account_external_id: `acc-${run}`, campaign_id: "c1", date: `${day}8`, cost: 79.5, clicks: 10 },
+      { workspace_id: wsA, platform: "google", account_external_id: `acc-${run}`, campaign_id: "c1", date: "2025-03-20", cost: 999, clicks: 1 }, // outside
+      { workspace_id: wsA, platform: "meta", account_external_id: `acc-${run}`, campaign_id: "m1", date: `${day}3`, cost: 50, clicks: 5 },
+    ]);
+
+    const args = { p_workspace: wsA, p_from: "2025-03-01T00:00:00Z", p_to: "2025-03-09T00:00:00Z", p_from_date: "2025-03-01", p_to_date: "2025-03-08" };
+    const { data, error } = await staffA.client.rpc("dashboard_report", args);
+    expect(error).toBeNull();
+    const ch = Object.fromEntries((data.channels as { channel: string }[]).map((c) => [c.channel, c]));
+    expect(ch.google_ads).toMatchObject({ leads: 2, qualified: 1, booked: 1, showed: 1, won: 1, not_qualified: 1, revenue: 5000 });
+    expect(ch.meta_ads).toMatchObject({ leads: 1, qualified: 1, booked: 1, showed: 0, won: 0 }); // no-show: booked, not showed
+    expect(ch.landing_page).toMatchObject({ leads: 1, qualified: 1, booked: 0, lost: 1 }); // lost = qualified, not won
+    expect(ch.call).toMatchObject({ leads: 1, qualified: 0 });
+    expect(Object.keys(ch).sort()).toEqual(["call", "google_ads", "landing_page", "meta_ads"]);
+    const spend = Object.fromEntries((data.spend as { platform: string; cost: number }[]).map((x) => [x.platform, Number(x.cost)]));
+    expect(spend).toEqual({ google: 200, meta: 50 });
+    expect(call).toBeTruthy();
+
+    // Attribution: the same cohort by campaign / landing page / keyword.
+    await admin.from("leads").update({ campaign_id: "111", campaign_name: "AC Repair" }).eq("customer_id", g2);
+    await admin.from("leads").update({ utm_campaign: "spring", utm_term: "AC Repair Near Me " }).eq("customer_id", m1);
+    const attr = async (dim: string) => (await staffA.client.rpc("attribution_report", { ...args, p_dim: dim })).data as { rows: Record<string, unknown>[]; spend: Record<string, unknown>[] };
+    const byCampaign = await attr("campaign");
+    expect(byCampaign.rows).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ channel: "google_ads", key: "111", label: "AC Repair", leads: 1, not_qualified: 1 }),
+        expect.objectContaining({ channel: "meta_ads", key: "spring", label: "spring", leads: 1, booked: 1 }),
+        expect.objectContaining({ channel: "google_ads", key: null, leads: 1, won: 1 }),
+      ]),
+    );
+    expect(byCampaign.spend.map((x) => [x.platform, x.campaign_id, Number(x.cost)]).sort()).toEqual([["google", "c1", 200], ["meta", "m1", 50]]);
+    expect((await attr("keyword")).rows).toEqual(expect.arrayContaining([expect.objectContaining({ key: "ac repair near me", leads: 1 })]));
+    expect((await attr("keyword")).spend).toEqual([]);
+    expect((await attr("landing_page")).rows.reduce((n, x) => n + Number(x.leads), 0)).toBe(5);
+    expect((await staffA.client.rpc("attribution_report", { ...args, p_dim: "bogus" })).data).toBeNull();
+    expect((await ownerB.client.rpc("attribution_report", { ...args, p_dim: "campaign" })).data).toEqual({ rows: [], spend: [] });
+
+    // Other businesses get nothing; nobody signed out runs it.
+    const other = (await ownerB.client.rpc("dashboard_report", args)).data;
+    expect(other).toEqual({ channels: [], spend: [] });
+    expect((await createClient(url!, anonKey!).rpc("dashboard_report", args)).error).not.toBeNull();
+
+    await admin.from("ad_spend_daily").delete().eq("account_external_id", `acc-${run}`);
+    await admin.from("appointments").delete().eq("workspace_id", wsA);
+  }, 120_000);
+
+  it("review queue: filed from calls and outcomes, resolved once with before / after; members only", async () => {
+    const cust = await admin.from("customers").insert({ workspace_id: wsA, full_name: "Review Test", phone: `+1214556${String(Date.now()).slice(-4)}` }).select("id").single();
+    const id = cust.data!.id;
+    const call = async (fields: Record<string, unknown>) => {
+      const r = await admin.from("calls").insert({ workspace_id: wsA, customer_id: id, provider_call_id: `rv-${run}-${Math.random()}`, direction: "outbound", trigger: "manual", status: "ended", ...fields }).select("id").single();
+      expect(r.error).toBeNull();
+      return r.data!.id as string;
+    };
+    const items = async (where: Record<string, string>) => {
+      let q = admin.from("review_items").select("*").eq("workspace_id", wsA);
+      for (const [k, v] of Object.entries(where)) q = q.eq(k, v);
+      return (await q).data!;
+    };
+
+    // A low-confidence call with an unknown service files two items; a test call files none.
+    const c1 = await call({ outcome: "qualified", confidence: 0.4, analysis: { service: "unknown" }, needs_review: true });
+    expect((await items({ call_id: c1 })).map((i) => i.kind).sort()).toEqual(["low_confidence", "unknown_service"]);
+    await call({ trigger: "test", outcome: "other", confidence: 0.1, analysis: { emergency: true } });
+    expect((await items({ customer_id: id })).length).toBe(2);
+    // Updating the same call does not file twice.
+    await admin.from("calls").update({ confidence: 0.3 }).eq("id", c1);
+    expect((await items({ call_id: c1 })).length).toBe(2);
+
+    // The AI said "not a fit"; the job was won anyway -> disagreement, and a big win -> high value.
+    const c2 = await call({ outcome: "not_qualified", confidence: 0.9 });
+    expect((await admin.rpc("set_outcome", { p_customer: id, p_status: "won", p_reason: null, p_amount: 12500, p_note: null })).error).toBeNull();
+    const dis = (await items({ customer_id: id, kind: "disagreement" }))[0];
+    expect(dis).toMatchObject({ field: "call_outcome", ai_value: "not_qualified", call_id: null, detail: { call_id: c2, result: "won" } });
+    const high = (await items({ customer_id: id, kind: "high_value" }))[0];
+    expect(high).toMatchObject({ field: "revenue", ai_value: "12500.00" });
+
+    // Members only; nobody writes directly.
+    expect((await staffA.client.from("review_items").select("id").eq("customer_id", id)).data!.length).toBe(4);
+    expect((await ownerB.client.from("review_items").select("id").eq("customer_id", id)).data).toEqual([]);
+    expect((await ownerA.client.from("review_items").update({ status: "approved" }).eq("id", dis.id).select()).data ?? []).toEqual([]);
+    expect((await ownerB.client.rpc("resolve_review_item", { p_item: dis.id, p_action: "approve", p_value: null, p_reason: null })).error).not.toBeNull();
+
+    // Correct the call result: applied to the call, AI's value kept, before / after stored, done once.
+    const resolve = (item: string, action: string, value: string | null, reason: string | null = null) =>
+      staffA.client.rpc("resolve_review_item", { p_item: item, p_action: action, p_value: value, p_reason: reason });
+    expect((await resolve(dis.id, "correct", null)).error?.message).toMatch(/value_required/);
+    expect((await resolve(dis.id, "correct", "maybe")).error?.message).toMatch(/bad_value/);
+    expect((await resolve(dis.id, "correct", "qualified", "they had a second house in the area")).error).toBeNull();
+    const c2row = (await admin.from("calls").select("outcome, original_outcome, needs_review").eq("id", c2).single()).data!;
+    expect(c2row).toMatchObject({ outcome: "qualified", original_outcome: "not_qualified", needs_review: false });
+    expect((await items({ id: dis.id }))[0]).toMatchObject({ status: "corrected", before: { outcome: "not_qualified" }, after: { outcome: "qualified" }, reviewed_by: staffA.id });
+    expect((await resolve(dis.id, "approve", null)).error?.message).toMatch(/done/);
+
+    // Revenue correction goes through set_outcome; "not sure" keeps the item aside, then it can be closed.
+    expect((await resolve(high.id, "unsure", null)).error).toBeNull();
+    expect((await items({ id: high.id }))[0].status).toBe("unsure");
+    expect((await resolve(high.id, "correct", "1250")).error).toBeNull();
+    expect((await admin.from("customers").select("revenue").eq("id", id).single()).data?.revenue).toBe(1250);
+
+    // Service correction sets the customer's service.
+    const svc = (await items({ call_id: c1, kind: "unknown_service" }))[0];
+    expect((await resolve(svc.id, "correct", "repair")).error).toBeNull();
+    expect((await admin.from("customers").select("service").eq("id", id).single()).data?.service).toBe("repair");
+
+    // Reviewing the call on its own page closes its open call items too.
+    expect((await staffA.client.rpc("review_call", { p_call: c1, p_outcome: null })).error).toBeNull();
+    expect((await items({ call_id: c1, kind: "low_confidence" }))[0]).toMatchObject({ status: "approved", reason: "Reviewed on the call page" });
+    const ev = (await admin.from("events").select("payload").eq("customer_id", id).eq("type", "review.resolved")).data!;
+    expect(ev.length).toBe(4);
+
+    await admin.from("calls").delete().eq("customer_id", id);
+    await admin.from("customers").delete().eq("id", id);
+  }, 120_000);
+
   it("ZIP lookup: readable by any signed-in user, not writable, and finds real ZIPs", async () => {
     const miami = await ownerA.client.rpc("zip_city_matches", { p_city: "miami", p_state: "FL" });
     expect(miami.data).toHaveLength(1);

@@ -10,7 +10,11 @@ import { TopSearch } from "./top-search";
 
 export default async function AppLayout({ children }: LayoutProps<"/">) {
   const [workspace, profile] = await Promise.all([requireWorkspace(), getProfile()]);
-  const { data: pending } = await (await createClient()).rpc("pending_outcome_counts", { p_workspace: workspace.id }).maybeSingle<{ visits: number; jobs: number }>();
+  const supabase = await createClient();
+  const [{ data: pending }, { count: toReview }] = await Promise.all([
+    supabase.rpc("pending_outcome_counts", { p_workspace: workspace.id }).maybeSingle<{ visits: number; jobs: number }>(),
+    supabase.from("review_items").select("id", { count: "exact", head: true }).eq("workspace_id", workspace.id).eq("status", "open"),
+  ]);
   const nav = {
     showSetup: workspace.role === "owner" && !workspace.setupCompletedAt,
     isAdmin: Boolean(profile?.is_platform_admin),
@@ -18,6 +22,7 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
     workspaceName: workspace.name,
     role: workspace.role,
     pendingOutcomes: (pending?.visits ?? 0) + (pending?.jobs ?? 0),
+    toReview: toReview ?? 0,
   };
   const email = profile?.email ?? "";
   const name = profile?.full_name?.trim() || email.split("@")[0] || "Account";

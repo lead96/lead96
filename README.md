@@ -99,6 +99,23 @@ Lead96 has its own calendar (Google Calendar sync comes later). Visits are **arr
 - **Calendar page** (`/calendar`): visits by day with Confirm / Done / No-show / Move / Cancel (`set_appointment_status()`, `reschedule_appointment()`), Done moves the customer to Showed, Cancel frees the place. Owners block days (`calendar_blackouts`); visits already booked on those days stay.
 - **Visit messages** (migration 020, `src/lib/notify/visits.ts`): a trigger on `appointments` plans `notification_jobs` - on booking a confirmation to the customer and a "new visit" email to the owners, plus reminders 24 h and 2 h before (only if still in the future); a move cancels the old reminders and plans a "visit moved" email and new reminders; a cancel drops what is still queued and sends a cancellation. The per-minute runner (`/api/cron/calls`) sends due jobs by email (Resend, sender name = the business, reply-to = the owner, idempotency key per job). Customers without an email and test addresses are skipped with the reason; other failures retry 3 times, 5 minutes apart. Each sent email shows on the customer timeline. SMS reminders wait for US texting registration (A2P).
 
+### Dashboard (M5)
+
+`/dashboard` reports a **cohort**: people whose first contact falls in the chosen period (last 7 / 30 / 90 days, this month, last month, in the business time zone - `periodFor()` in `src/lib/dashboard/report.ts`), and how far each got: qualified, booked, showed, won, revenue. The counts come from `dashboard_report()` (migration 024, runs as the caller so RLS applies). A stage counts if it was ever reached (a job later lost still counts as booked); a cancelled visit does not count as booked.
+
+- **Channel = first touch**, from `lead_channel()`: a landing page lead with a Google click ID or `utm_source=google` is **Google Ads**, with a Facebook click ID or `utm_source=facebook` / `instagram` it is **Facebook / Instagram ads**; otherwise the lead's source (landing page without an ad click, phone call, CSV, added by hand).
+- **Cost:** ad spend per platform for the same days (`ad_spend_daily`) goes on its channel: cost per lead and **cost per booking (CPQBA)** = spend / booked visits. Spend with no leads still shows. Spend is assumed to be in USD.
+- **Attribution views:** the table switches between Source, Campaign, Landing page, Ad and Keyword (`?by=`, kept together with the period). `attribution_report()` (migration 025) groups the same cohort (`cohort_funnel()`) by the first lead's campaign (campaign ID or utm_campaign), landing page, ad (ad ID or utm_content) or keyword (keyword or utm_term, lower-cased), per channel. Campaign spend is matched in `buildAttribution()` by campaign ID, or by name for leads that only carry utm_campaign; spend no lead matched gets its own row. Ads, keywords and landing pages show no spend (it is synced per campaign). Top 50 rows; the total counts all.
+
+### Review queue (M5)
+
+`review_items` (migration 026) are filed by database triggers, never by hand:
+
+- from AI calls (`file_call_reviews`, test calls never): **AI unsure** (confidence under 60%), **Emergency**, **Unclear call** (outcome other), **Call failed**, **Unknown service** (the person talked, the AI matched no service);
+- from outcomes (`file_outcome_reviews`): **AI and result disagree** (AI said not a fit / not interested / wrong number but the job showed or was won, or AI said qualified / booked and the team marked it not qualified) and **High-value job** (won at $10,000+ or 3x the business's average win).
+
+`/review` (count in the menu) shows each with what the AI said, the real result, the call summary and a link to the call. **Approve / Correct / Reject / Not sure** go through `resolve_review_item()`: a correction is applied to the record (call outcome, keeping the AI's in `original_outcome`; the customer's service; revenue via `set_outcome`), and before / after, reason, reviewer and time are stored (the learning record) plus a timeline entry. "Not sure" keeps the item aside in its own tab; "Done" lists the last 50 decisions. Reviewing a call on its own page closes its open call items too.
+
 ### Outcomes (M5)
 
 The job result lives on the customer (migration 022): status **Not qualified** (with a reason), the estimate amount, the revenue of a **Won** job and the reason a job was **Lost** (lists in `src/lib/leads/outcomes.ts`). Every change goes through `set_outcome()`, which enforces the rules in the database too (won needs revenue, lost / not qualified need a reason) and writes a timeline event with who, when, amount, reason and note; correcting the amount keeps the first close date.

@@ -17,6 +17,7 @@ export const TABLE_LABELS: Record<string, string> = {
   phone_numbers: "Phone number",
   ad_accounts: "Ad account",
   texting_registrations: "Texting registration",
+  review_items: "Review item",
   profiles: "User",
 };
 

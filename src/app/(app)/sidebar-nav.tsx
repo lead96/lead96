@@ -12,6 +12,7 @@ import {
   LayoutDashboard,
   ListChecks,
   PanelsTopLeft,
+  ScanSearch,
   Plug,
   Plus,
   Settings,
@@ -34,12 +35,14 @@ export type SidebarProps = {
   role: string;
   /** Past visits and finished jobs without a result (shown as a count on Outcomes). */
   pendingOutcomes?: number;
+  /** Open review items (count on Review). */
+  toReview?: number;
   /** Called after a link is followed (the mobile drawer closes itself with it). */
   onNavigate?: () => void;
 };
 
 /** Quick actions + navigation + business name. Used by the desktop sidebar and the mobile drawer. */
-export function SidebarContent({ showSetup, isAdmin, isOwner, workspaceName, role, pendingOutcomes = 0, onNavigate }: SidebarProps) {
+export function SidebarContent({ showSetup, isAdmin, isOwner, workspaceName, role, pendingOutcomes = 0, toReview = 0, onNavigate }: SidebarProps) {
   const pathname = usePathname();
   const groups: { label?: string; items: Item[] }[] = [
     {
@@ -51,6 +54,7 @@ export function SidebarContent({ showSetup, isAdmin, isOwner, workspaceName, rol
         { href: "/landing-pages", label: "Landing pages", icon: PanelsTopLeft },
         { href: "/calendar", label: "Calendar", icon: CalendarDays },
         { href: "/outcomes", label: "Outcomes", icon: ClipboardCheck, badge: pendingOutcomes ? String(pendingOutcomes) : undefined },
+        { href: "/review", label: "Review", icon: ScanSearch, badge: toReview ? String(toReview) : undefined },
       ],
     },
     {

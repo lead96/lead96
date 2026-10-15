@@ -17,6 +17,7 @@ import { BookVisitForm } from "../../calendar/forms";
 import { calendarContext } from "@/lib/calendar/service";
 import { openWindows } from "@/lib/calendar/slots";
 import { money, reasonLabel } from "@/lib/leads/outcomes";
+import { REVIEW_KINDS, type ReviewKind } from "@/lib/review/items";
 import { NotesForm, StatusForm } from "./forms";
 
 export const metadata: Metadata = { title: "Customer" };
@@ -209,6 +210,11 @@ export default async function CustomerPage({ params }: PageProps<"/leads/[id]">)
         };
       case "appointment.requested":
         return { title: `Visit requested: ${p.label}`, detail: [p.address, p.notes, "chosen on an AI call, team to confirm"].filter(Boolean).join(" · ") };
+      case "review.resolved": {
+        const kind = REVIEW_KINDS[p.kind as ReviewKind]?.label ?? "Review";
+        const verb = { approve: "approved", correct: "corrected", reject: "rejected", unsure: "set aside as not sure" }[p.action ?? ""] ?? "reviewed";
+        return { title: `Review (${kind}): ${verb}`, detail: [p.reason, actorName(e.actor_id) ? `by ${actorName(e.actor_id)}` : null].filter(Boolean).join(" · ") || undefined };
+      }
       case "customer.do_not_call":
         return { title: "Do not call", detail: p.reason };
       case "customer.possible_duplicate":
