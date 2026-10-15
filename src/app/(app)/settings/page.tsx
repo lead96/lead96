@@ -1,9 +1,10 @@
 import type { Metadata } from "next";
-import { Badge, Card, PageHeader } from "@/components/ui";
+import { Alert, Badge, Card, PageHeader } from "@/components/ui";
 import { requireWorkspace } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
+import { BUSINESS_TYPES, STATUS_LABELS, type BusinessType, type Registration, type TextingStatus } from "@/lib/texting/registration";
 import { removeMember, revokeInvite } from "./actions";
-import { AutoCallForm, BusinessForm, InviteForm } from "./forms";
+import { AutoCallForm, BusinessForm, InviteForm, TextingForm } from "./forms";
 
 export const metadata: Metadata = { title: "Settings" };
 
@@ -12,7 +13,7 @@ export default async function SettingsPage() {
   const isOwner = workspace.role === "owner";
   const supabase = await createClient();
 
-  const [{ data: business }, { data: members }, { data: invites }, { data: voice }, { data: numbers }] = await Promise.all([
+  const [{ data: business }, { data: members }, { data: invites }, { data: voice }, { data: numbers }, { data: texting }] = await Promise.all([
     supabase.from("workspaces").select("name, timezone, phone, website").eq("id", workspace.id).single(),
     supabase
       .from("workspace_members")
@@ -29,7 +30,11 @@ export default async function SettingsPage() {
       : Promise.resolve({ data: [] as { id: string; email: string; role: string; expires_at: string }[] }),
     supabase.from("voice_agents").select("retell_agent_id, auto_call").eq("workspace_id", workspace.id).maybeSingle(),
     supabase.from("phone_numbers").select("e164").eq("workspace_id", workspace.id),
+    // Owners only (holds the EIN; RLS hides it from staff too).
+    isOwner ? supabase.from("texting_registrations").select("*").eq("workspace_id", workspace.id).maybeSingle() : Promise.resolve({ data: null }),
   ]);
+  const reg = texting as (Registration & { status: TextingStatus; admin_note: string | null }) | null;
+  const regEditable = !reg || reg.status === "draft" || reg.status === "rejected";
   const aiReady = Boolean(voice?.retell_agent_id);
   const aiNumber = numbers?.[0]?.e164.replace(/^\+1(\d{3})(\d{3})(\d{4})$/, "($1) $2-$3") ?? null;
 
@@ -109,6 +114,55 @@ export default async function SettingsPage() {
             </>
           ) : null}
         </Card>
+
+        {isOwner ? (
+          <Card className="p-6 lg:col-span-2">
+            <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+              <h2 className="font-semibold text-slate-900">Texting (US SMS registration)</h2>
+              <Badge tone={STATUS_LABELS[reg?.status ?? "draft"].tone}>{STATUS_LABELS[reg?.status ?? "draft"].label}</Badge>
+            </div>
+            <p className="mb-5 max-w-3xl text-sm leading-relaxed text-slate-500">
+              Before the AI can text your customers (follow-ups after a missed call, visit reminders), US carriers need your business registered as the
+              sender. Lead96 files it for you with these details; the review takes about 2-3 weeks. Until then, customers get their visit confirmation
+              and reminders by email.
+            </p>
+            {reg?.status === "rejected" && reg.admin_note ? (
+              <div className="mb-5">
+                <Alert tone="error">Please fix and send again: {reg.admin_note}</Alert>
+              </div>
+            ) : null}
+            {regEditable ? (
+              <TextingForm values={reg} />
+            ) : (
+              <>
+                <p className="mb-4 text-sm text-slate-600">
+                  {reg?.status === "approved"
+                    ? "Your business is registered. The AI can text customers who agreed to texts on your form."
+                    : reg?.status === "in_review"
+                      ? "Lead96 filed your registration. The carriers are reviewing it (about 2-3 weeks)."
+                      : "Lead96 has your details and will file the registration. We keep you posted here."}
+                  {reg?.admin_note ? ` ${reg.admin_note}` : ""}
+                </p>
+                <dl className="grid gap-x-6 gap-y-2 text-sm sm:grid-cols-2">
+                  {[
+                    ["Legal name", reg?.legal_name],
+                    ["Business type", BUSINESS_TYPES[reg?.business_type as BusinessType]],
+                    ["EIN", reg?.ein],
+                    ["Website", reg?.website],
+                    ["Address", `${reg?.street}, ${reg?.city}, ${reg?.state} ${reg?.zip}`],
+                    ["Contact", `${reg?.contact_first_name} ${reg?.contact_last_name} (${reg?.contact_title})`],
+                  ].map(([k, val]) => (
+                    <div key={k} className="flex gap-2">
+                      <dt className="w-28 shrink-0 text-slate-500">{k}</dt>
+                      <dd className="min-w-0 break-words text-slate-900">{val}</dd>
+                    </div>
+                  ))}
+                </dl>
+                <p className="mt-4 text-xs text-slate-500">To change these details, contact Lead96 at admin@lead96.com.</p>
+              </>
+            )}
+          </Card>
+        ) : null}
       </div>
     </>
   );

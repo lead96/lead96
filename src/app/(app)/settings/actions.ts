@@ -7,6 +7,7 @@ import { sendEmail } from "@/lib/email/send";
 import { inviteEmail } from "@/lib/email/templates";
 import { publicEnv } from "@/lib/env";
 import { createClient } from "@/lib/supabase/server";
+import { FIELDS, parseRegistration, type Registration } from "@/lib/texting/registration";
 import { US_TIMEZONES } from "@/lib/timezones";
 
 export type SettingsState =
@@ -123,4 +124,25 @@ export async function setAutoCall(_: AutoCallState, formData: FormData): Promise
   if (error) return { error: error.code === "P0002" ? "The AI caller is not set up for this business yet." : "Could not save. Please try again." };
   revalidatePath("/settings");
   return { message: on ? "The AI now calls new leads automatically." : "Automatic calls are off." };
+}
+
+export type TextingState = { error?: string; message?: string; fields?: Record<string, string> } | undefined;
+
+/** Owner saves the US texting details, or sends them to Lead96 for registration in Retell. */
+export async function saveTextingRegistration(_: TextingState, formData: FormData): Promise<TextingState> {
+  const workspace = await requireOwner();
+  const submit = formData.get("intent") === "submit";
+  const fields = Object.fromEntries(FIELDS.map((k) => [k, String(formData.get(k) ?? "")])) as Registration;
+  const parsed = parseRegistration(fields);
+  if (!parsed.ok) return { error: parsed.error, fields };
+
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("save_texting_registration", { p_workspace: workspace.id, p: parsed.data, p_submit: submit });
+  if (error) {
+    if (error.message.includes("locked")) return { error: "Lead96 already has these details. Contact us to change them.", fields };
+    return { error: "Could not save. Please try again.", fields };
+  }
+  revalidatePath("/settings");
+  revalidatePath("/admin/texting");
+  return { message: submit ? "Sent to Lead96. We file the registration and keep you posted here." : "Saved. Send it to Lead96 when it is complete." };
 }

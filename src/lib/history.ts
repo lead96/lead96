@@ -16,6 +16,7 @@ export const TABLE_LABELS: Record<string, string> = {
   voice_agents: "AI caller",
   phone_numbers: "Phone number",
   ad_accounts: "Ad account",
+  texting_registrations: "Texting registration",
   profiles: "User",
 };
 

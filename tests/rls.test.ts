@@ -479,6 +479,49 @@ describe.skipIf(!configured)("row-level security", () => {
     await admin.from("appointments").delete().eq("workspace_id", wsA);
   }, 120_000);
 
+  it("texting registration: owners save and send, staff and others never see the EIN, only platform admins decide", async () => {
+    const details = {
+      legal_name: "Test Air LLC", brand_name: "", business_type: "llc", ein: "12-3456789", website: "https://testair.com",
+      street: "1 Main St", city: "Dallas", state: "TX", zip: "75201",
+      contact_first_name: "Ann", contact_last_name: "Lee", contact_title: "Owner", contact_email: "ann@testair.com", contact_phone: "+12145550100",
+    };
+    expect((await staffA.client.rpc("save_texting_registration", { p_workspace: wsA, p: details, p_submit: true })).error).not.toBeNull();
+    expect((await ownerB.client.rpc("save_texting_registration", { p_workspace: wsA, p: details, p_submit: true })).error).not.toBeNull();
+    expect((await ownerA.client.from("texting_registrations").insert({ workspace_id: wsA, ...details })).error).not.toBeNull();
+    // Bad values are refused by the database too.
+    expect((await ownerA.client.rpc("save_texting_registration", { p_workspace: wsA, p: { ...details, ein: "123" }, p_submit: false })).error).not.toBeNull();
+
+    expect((await ownerA.client.rpc("save_texting_registration", { p_workspace: wsA, p: details, p_submit: false })).data).toBe("draft");
+    expect((await ownerA.client.rpc("set_texting_registration_status", { p_workspace: wsA, p_status: "approved", p_note: "" })).error).not.toBeNull();
+    expect((await ownerA.client.rpc("save_texting_registration", { p_workspace: wsA, p: details, p_submit: true })).data).toBe("submitted");
+    expect((await ownerA.client.from("texting_registrations").select("ein").eq("workspace_id", wsA).single()).data?.ein).toBe("12-3456789");
+    expect((await staffA.client.from("texting_registrations").select("ein").eq("workspace_id", wsA)).data).toEqual([]);
+    expect((await ownerB.client.from("texting_registrations").select("ein").eq("workspace_id", wsA)).data).toEqual([]);
+    // Once sent, the owner can no longer change it.
+    expect((await ownerA.client.rpc("save_texting_registration", { p_workspace: wsA, p: details, p_submit: true })).error?.message).toMatch(/locked/);
+
+    const platform = await makeUser(admin, "platform-sms");
+    try {
+      await admin.from("profiles").update({ is_platform_admin: true }).eq("id", platform.id);
+      const set = (status: string, note: string) => platform.client.rpc("set_texting_registration_status", { p_workspace: wsA, p_status: status, p_note: note });
+      expect((await set("rejected", "")).error).not.toBeNull(); // a reason is required
+      expect((await set("rejected", "EIN does not match the legal name")).error).toBeNull();
+      // Rejected: back to the owner, who fixes and sends again.
+      expect((await ownerA.client.rpc("save_texting_registration", { p_workspace: wsA, p: { ...details, legal_name: "Test Air Services LLC" }, p_submit: true })).data).toBe("submitted");
+      expect((await set("approved", "")).error).toBeNull();
+      const row = (await ownerA.client.from("texting_registrations").select("status, legal_name, decided_at").eq("workspace_id", wsA).single()).data!;
+      expect(row).toMatchObject({ status: "approved", legal_name: "Test Air Services LLC" });
+      expect(row.decided_at).not.toBeNull();
+      expect((await platform.client.rpc("set_texting_registration_status", { p_workspace: wsB, p_status: "approved", p_note: "" })).error?.code).toBe("P0002");
+      // History keeps the change but never the EIN.
+      const log = (await admin.from("change_log").select("old_values, new_values").eq("table_name", "texting_registrations").eq("row_id", wsA)).data!;
+      expect(log.length).toBeGreaterThan(0);
+      expect(JSON.stringify(log)).not.toContain("3456789");
+    } finally {
+      await admin.auth.admin.deleteUser(platform.id);
+    }
+  }, 120_000);
+
   it("ZIP lookup: readable by any signed-in user, not writable, and finds real ZIPs", async () => {
     const miami = await ownerA.client.rpc("zip_city_matches", { p_city: "miami", p_state: "FL" });
     expect(miami.data).toHaveLength(1);
