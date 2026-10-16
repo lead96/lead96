@@ -1,0 +1,44 @@
+# Checks every push to main and every pull request: types, lint, unit tests, production build.
+# Needs no secrets. The database tests (tests/rls.test.ts and other files that need
+# SUPABASE_SERVICE_ROLE_KEY) skip themselves here: the only database today is the shared dev/prod
+# one, and CI must not write test data into it. They run locally (npm test with .env.local) and will
+# run in CI against a separate test database once one exists.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      NEXT_TELEMETRY_DISABLED: "1"
+      # Placeholders so the build can run; nothing connects to them.
+      NEXT_PUBLIC_SUPABASE_URL: https://example.supabase.co
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ci-placeholder
+      NEXT_PUBLIC_APP_URL: https://lead96.com
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - name: Type check
+        run: npm run typecheck
+      - name: Lint
+        run: npm run lint
+      - name: Unit tests
+        run: npm test
+      - name: Production build
+        run: npm run build

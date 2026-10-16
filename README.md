@@ -138,6 +138,10 @@ The job result lives on the customer (migration 022): status **Not qualified** (
 
 US carriers need each contractor registered as the sender before the AI may text (A2P 10DLC; Retell: one business profile, brand and campaign per contractor, dashboard only, no API). Owners fill in **Settings > Texting** (legal name, business type, EIN, website, address, contact) and send it to Lead96; values are checked in `src/lib/texting/registration.ts` and saved through `save_texting_registration()` (migration 021), which only lets owners change it while it is a draft or was sent back. Staff never see it (it holds the EIN), and the change history leaves the EIN out. Platform admins work through **Admin > Texting**: every field plus the campaign text written for that contractor (description, samples, opt-in with the real consent text and landing page URL) with copy buttons, and set the status (filed, approved, needs changes with a note the owner sees). Approving re-links the business's numbers in Retell so texts start at once.
 
+### CI
+
+`.github/workflows/ci.yml` runs on every push to `main` and every pull request: `npm ci`, `npm run typecheck`, `npm run lint`, `npm test`, `npm run build` (Node 24, placeholder `NEXT_PUBLIC_*` values, no secrets). Tests that need the database skip themselves without `SUPABASE_SERVICE_ROLE_KEY`, so CI never writes into the shared dev/prod database; run them locally with `.env.local` (on Windows from PowerShell). Vercel still deploys on its own; CI only reports.
+
 ### Security
 
 Row-level security on every table; signed-out visitors have no table rights at all (migration 029, also for future tables). Webhooks and tools are HMAC-signed or keyed (constant-time checks), cron routes need `CRON_SECRET`. Security headers are set in `next.config.ts` (no framing, nosniff, referrer and permissions policy, small CSP; the microphone is allowed for our own pages because of browser test calls). Landing images: PNG / JPEG / WebP only. Review and open items: `docs/09-security-review.md`.
