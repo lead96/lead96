@@ -179,7 +179,7 @@ Owners invite from **Settings**. The invite is emailed (Resend) and the link is 
 | `npm run db:seed:zips` | Load the US ZIP code table from `supabase/seed/us_zip_codes.csv` |
 | `npm run intake:test-call` | Send a signed test call to `/api/intake/call` (`-- --workspace <id> [--url ...] [--status missed] [--source google] [--call-id ...]`) |
 | `npm run db:types` | Regenerate `src/lib/supabase/database.types.ts` |
-| `npm run db:export` | Safety copy of all data as JSON into `backups/<timestamp>/` (git-ignored; `-- --files` adds stored files). Needs `SUPABASE_ACCESS_TOKEN`. See `handover/backup-restore.md` |
+| `npm run db:export` | Safety copy of all data as JSON into `backups/<timestamp>/` (git-ignored; `-- --files` adds stored files, `--keep N` deletes all but the newest N copies). Needs `SUPABASE_ACCESS_TOKEN`. Daily on a Windows PC: `scripts/register-backup-task.ps1`. See `handover/backup-restore.md` |
 
 ## Layout
 

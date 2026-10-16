@@ -33,7 +33,7 @@ Every account should have Husam (Halawa GmbH) as owner and Riku as admin, and ev
 | System | Account today | To do |
 |---|---|---|
 | GitHub `lead96/lead96` | admin@lead96.com | Riku as admin |
-| Vercel (lead96.com) | check | Owned by admin@lead96.com (or Husam as owner), Riku as member |
+| Vercel (lead96.com) | admin@lead96.com (Husam); managed by Riku | Keep; deploys automatically from GitHub `main` |
 | Supabase "Lead96" | admin@lead96.com | Riku as Developer or Owner |
 | Retell AI | Lead96 account (identity check done by Husam) | Check both have access |
 | Resend (lead96.com domain) | check | Both have access |
@@ -44,7 +44,7 @@ Every account should have Husam (Halawa GmbH) as owner and Riku as admin, and ev
 
 ## Open items at handover
 
-1. **Backups:** the Supabase free plan keeps none. Upgrade to Pro and test a restore ([Backup and restore](backup-restore.md)). Until then run `npm run db:export` regularly.
+1. **Backups:** the Supabase free plan keeps none. Upgrade to Pro and test a restore ([Backup and restore](backup-restore.md)). Until then a daily export runs on Riku's PC (`scripts/register-backup-task.ps1`).
 2. **Separate production database** from development.
 3. **Outside monitoring** (Sentry or an uptime check): the failure alert emails can't report the app itself being down.
 4. **Meta** credentials, **US texting registration** per contractor, **legal review** of consent and the legal pages.

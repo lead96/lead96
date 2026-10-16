@@ -9,6 +9,7 @@
  *
  *   npm run db:export
  *   npm run db:export -- --files
+ *   npm run db:export -- --files --keep 14     (then delete all but the newest 14 copies)
  *
  * Needs SUPABASE_ACCESS_TOKEN (Management API, reads without row-level security) and, for --files,
  * SUPABASE_SERVICE_ROLE_KEY, from .env.local. The export holds customer data and encrypted secrets:
@@ -23,6 +24,8 @@ const token = process.env.SUPABASE_ACCESS_TOKEN;
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
 const ref = process.env.SUPABASE_PROJECT_REF || url.match(/^https:\/\/([a-z0-9]+)\.supabase\.co/)?.[1];
 const withFiles = process.argv.includes("--files");
+const keepArg = process.argv.indexOf("--keep");
+const keep = keepArg > 0 ? Number(process.argv[keepArg + 1]) : null;
 // Re-created from supabase/seed by `npm run db:seed:zips`; no need to copy 41k rows.
 const SKIP = new Set(["us_zip_codes"]);
 const CHUNK = 5000;
@@ -95,6 +98,15 @@ async function main() {
   }
 
   fs.writeFileSync(path.join(dir, "manifest.json"), JSON.stringify(manifest, null, 2));
+
+  if (keep && Number.isInteger(keep) && keep > 0) {
+    // Only folders this script made (timestamp names); anything else in backups/ is left alone.
+    const copies = fs.readdirSync("backups").filter((d) => /^\d{4}-\d{2}-\d{2}T[\d-]+Z$/.test(d)).sort();
+    for (const old of copies.slice(0, Math.max(0, copies.length - keep))) {
+      fs.rmSync(path.join("backups", old), { recursive: true, force: true });
+      console.log(`removed old copy ${old}`);
+    }
+  }
   console.log(`\nExported to ${dir} (${Object.keys(manifest.tables).length} tables, ${manifest.storage_objects} stored files listed${withFiles ? `, ${manifest.files} downloaded` : ""}).`);
 }
 

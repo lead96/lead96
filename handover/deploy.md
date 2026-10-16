@@ -4,7 +4,7 @@
 
 1. Work on a branch or on `main`; run `npm run typecheck`, `npm run lint` and `npm test` locally (on Windows run tests from PowerShell).
 2. Push to GitHub. **CI** (`.github/workflows/ci.yml`) runs type check, lint, unit tests and a production build on every push to `main` and every pull request. Database tests skip in CI (they need the database key and must not write into the shared database); run them locally.
-3. **Vercel**: with the project connected to the GitHub repo (Vercel > Project > Settings > Git), every push to `main` deploys to production (lead96.com) and other branches get preview URLs. Without the connection, deploy with `npx vercel --prod`. Check which applies and note it here.
+3. **Vercel** (account admin@lead96.com, managed by Riku) is connected to the GitHub repo: every push to `main` deploys to production (lead96.com) automatically, and other branches get preview URLs.
 4. Check the deployment in Vercel (Deployments) and open lead96.com.
 
 ## Database changes (migrations)

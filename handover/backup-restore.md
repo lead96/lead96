@@ -4,7 +4,8 @@
 
 - **No automatic backups.** The Supabase project is on the free plan, which keeps no database backups (Supabase reports an empty backup list). A deleted table, a bad migration or a mistake in development (which shares the database) can't be undone from Supabase.
 - **Safety copy:** `npm run db:export` (add `-- --files` to include stored files) writes every table as JSON, the sign-in accounts (without passwords) and the list of stored files into `backups/<timestamp>/` on the machine that runs it (git-ignored). It needs `SUPABASE_ACCESS_TOKEN` in `.env.local`. About 4 MB today.
-  - Run it at least weekly and before risky changes; keep copies where only owners can read them (they contain customer data and encrypted secrets). Delete old copies you don't need.
+  - **Daily, automatic:** `scripts/register-backup-task.ps1` registers a Windows scheduled task on the machine that runs it (Riku's PC): every day at 13:00 (or as soon as the PC is on), `npm run db:export -- --files --keep 14`, keeping the newest 14 copies, log in `backups/export.log`. Run the script once from PowerShell: `powershell -ExecutionPolicy Bypass -File scripts\register-backup-task.ps1`. Remove: `Unregister-ScheduledTask -TaskName "Lead96 data export" -Confirm:$false`.
+  - Also run it by hand before risky changes. The copies contain customer data and encrypted secrets: keep them where only owners can read them.
 - **Code** is safe in GitHub; **configuration** is in [Environments and secrets](environments-and-secrets.md) and the password manager.
 
 ## Target before the pilot ("3 copies")
