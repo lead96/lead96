@@ -29,6 +29,8 @@ const serverSchema = publicSchema.extend({
   /** Resend API key for app emails (invites). Auth emails go through Supabase SMTP instead. */
   RESEND_API_KEY: z.string().startsWith("re_").optional(),
   EMAIL_FROM: z.string().min(3).default("Lead96 <no-reply@lead96.com>"),
+  /** Failure alerts go to these (comma-separated) instead of every platform admin. */
+  OPS_ALERT_EMAILS: z.string().min(3).optional(),
   // AI voice: Lead96's Retell account (agents, numbers, calls). Webhooks are signed with this key.
   RETELL_API_KEY: z.string().min(10).optional(),
   RETELL_VOICE_ID: z.string().min(1).default("retell-Cimo"),
@@ -57,6 +59,7 @@ const OPTIONAL_KEYS = [
   "META_BUSINESS_ID",
   "RESEND_API_KEY",
   "EMAIL_FROM",
+  "OPS_ALERT_EMAILS",
   "RETELL_API_KEY",
   "RETELL_VOICE_ID",
   "RETELL_LLM_MODEL",

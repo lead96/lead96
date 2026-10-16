@@ -881,6 +881,31 @@ describe.skipIf(!configured)("row-level security", () => {
     }
   }, 120_000);
 
+  it("failure alerts: failures counted per window; only the server plans and reads them", async () => {
+    const cust = await admin.from("customers").insert({ workspace_id: wsA, full_name: "Ops Test", phone: `+1214548${String(Date.now()).slice(-4)}` }).select("id").single();
+    const job = await admin.from("call_jobs").insert({ workspace_id: wsA, customer_id: cust.data!.id, trigger: "manual", status: "failed", reason: `ops ${run}` }).select("id, updated_at").single();
+    try {
+      const from = new Date(Date.parse(job.data!.updated_at) - 1000).toISOString();
+      const to = new Date(Date.parse(job.data!.updated_at) + 1000).toISOString();
+      const { data, error } = await admin.rpc("ops_failures", { p_from: from, p_to: to });
+      expect(error).toBeNull();
+      expect(data.counts["Call job"]).toBeGreaterThanOrEqual(1);
+      expect(data.examples.some((e: { message: string; business: string }) => e.message === `ops ${run}` && e.business === `A ${run}`)).toBe(true);
+      // A window without it doesn't count it.
+      const before = (await admin.rpc("ops_failures", { p_from: "2000-01-01T00:00:00Z", p_to: "2000-01-02T00:00:00Z" })).data;
+      expect(before.counts["Call job"]).toBeUndefined();
+      // Users can't run or read any of it.
+      expect((await ownerA.client.rpc("ops_failures", { p_from: from, p_to: to })).error).not.toBeNull();
+      expect((await ownerA.client.rpc("plan_ops_alert")).error).not.toBeNull();
+      expect((await ownerA.client.rpc("claim_ops_alerts")).error).not.toBeNull();
+      expect((await ownerA.client.from("ops_alerts").select("id").limit(1)).data).toEqual([]);
+      expect((await ownerA.client.from("ops_alerts").insert({ window_from: from, window_to: to, counts: {} })).error).not.toBeNull();
+    } finally {
+      await admin.from("call_jobs").delete().eq("id", job.data!.id);
+      await admin.from("customers").delete().eq("id", cust.data!.id);
+    }
+  }, 120_000);
+
   it("ZIP lookup: readable by any signed-in user, not writable, and finds real ZIPs", async () => {
     const miami = await ownerA.client.rpc("zip_city_matches", { p_city: "miami", p_state: "FL" });
     expect(miami.data).toHaveLength(1);

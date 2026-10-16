@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { isUndeliverableAddress } from "@/lib/email/address";
-import { inviteEmail, pendingOutcomesEmail, teamBookingEmail, visitEmail } from "@/lib/email/templates";
+import { inviteEmail, opsAlertEmail, pendingOutcomesEmail, teamBookingEmail, visitEmail } from "@/lib/email/templates";
 
 describe("invite email", () => {
   const url = "https://lead96.com/invite/abc123";
@@ -96,5 +96,22 @@ describe("pending outcomes email", () => {
     const e = pendingOutcomesEmail({ business: "B", visits: 0, jobs: 1, examples: [], url: "https://lead96.com/outcomes" });
     expect(e.subject).toBe("B: 1 visit result to record");
     expect(e.text).not.toContain("past visit");
+  });
+});
+
+describe("failure alert email", () => {
+  it("totals the problems, lists counts and examples, links Admin", () => {
+    const e = opsAlertEmail({
+      counts: { "Call job": 2, Email: 1 },
+      examples: [{ kind: "Call job", at: "2026-10-16T10:00:00Z", message: "Retell <500>", business: "Cool Air HVAC" }],
+      windowLabel: "between 9:05 and 10:05 AM ET",
+      url: "https://lead96.com/admin/businesses",
+    });
+    expect(e.subject).toBe("Lead96: 3 problems between 9:05 and 10:05 AM ET");
+    expect(e.text).toContain("Call job: 2");
+    expect(e.text).toContain("Call job (Cool Air HVAC): Retell <500>");
+    expect(e.html).toContain("Retell &lt;500&gt;");
+    expect(e.html).toContain('href="https://lead96.com/admin/businesses"');
+    expect(opsAlertEmail({ counts: { Text: 1 }, examples: [], windowLabel: "x", url: "u" }).subject).toBe("Lead96: 1 problem x");
   });
 });

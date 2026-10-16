@@ -120,3 +120,29 @@ export function pendingOutcomesEmail(p: { business: string; visits: number; jobs
   const text = [`Visit results to record for ${p.business}`, "", ...parts, ...(p.examples.length ? ["", ...p.examples] : []), "", `Record results: ${p.url}`].join("\n");
   return { subject, html, text };
 }
+
+/** To the platform admins: what failed in the last hour (counts and a few examples). */
+export function opsAlertEmail(p: {
+  counts: Record<string, number>;
+  examples: { kind: string; at: string; message: string; business: string | null }[];
+  windowLabel: string;
+  url: string;
+}) {
+  const total = Object.values(p.counts).reduce((a, b) => a + b, 0);
+  const lines = Object.entries(p.counts)
+    .sort((a, b) => b[1] - a[1])
+    .map(([k, n]) => `${k}: ${n}`);
+  const examples = p.examples.map((e) => `${e.kind}${e.business ? ` (${e.business})` : ""}: ${e.message}`);
+  const subject = `Lead96: ${total} problem${total === 1 ? "" : "s"} ${p.windowLabel}`;
+  const html = [
+    `<h2>${total} problem${total === 1 ? "" : "s"} ${esc(p.windowLabel)}</h2>`,
+    `<p>${lines.map(esc).join("<br>")}</p>`,
+    examples.length ? `<p style="${NOTE}">${examples.map(esc).join("<br>")}</p>` : "",
+    `<p><a href="${esc(p.url)}" style="${BUTTON}">Open Admin</a></p>`,
+    `<p style="${NOTE}">Sent at most once an hour, only when something failed.</p>`,
+  ]
+    .filter(Boolean)
+    .join("\n");
+  const text = [subject, "", ...lines, ...(examples.length ? ["", ...examples] : []), "", `Open Admin: ${p.url}`].join("\n");
+  return { subject, html, text };
+}
