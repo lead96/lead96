@@ -2,6 +2,8 @@
 
 AI lead-generation platform for home-service contractors: leads and calls in one CRM, an AI voice agent that qualifies and books, and outcome/revenue tracking by source.
 
+Operating manual (accounts, settings, deploy, runbooks, backups): [handover/](handover/README.md).
+
 ## Stack
 
 Next.js 16 (App Router, TypeScript, Tailwind) · Supabase (Postgres, Auth, Storage, RLS) · OpenAI · Vitest.
@@ -177,6 +179,7 @@ Owners invite from **Settings**. The invite is emailed (Resend) and the link is 
 | `npm run db:seed:zips` | Load the US ZIP code table from `supabase/seed/us_zip_codes.csv` |
 | `npm run intake:test-call` | Send a signed test call to `/api/intake/call` (`-- --workspace <id> [--url ...] [--status missed] [--source google] [--call-id ...]`) |
 | `npm run db:types` | Regenerate `src/lib/supabase/database.types.ts` |
+| `npm run db:export` | Safety copy of all data as JSON into `backups/<timestamp>/` (git-ignored; `-- --files` adds stored files). Needs `SUPABASE_ACCESS_TOKEN`. See `handover/backup-restore.md` |
 
 ## Layout
 
@@ -195,6 +198,7 @@ src/
     supabase/             server, browser, proxy and admin clients
   proxy.ts                session refresh + auth redirect (Next 16 "proxy")
 supabase/migrations/      schema, RLS, reference data
+handover/                 operating manual (environments, deploy, database, integrations, runbooks, backups)
 tests/                    integration tests
 ```
 

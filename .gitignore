@@ -45,3 +45,6 @@ docs/
 
 # Source material (contains personal data: passport/ID numbers, emails, wallet address)
 info/
+
+# Data exports (npm run db:export): customer data, never commit
+backups/
