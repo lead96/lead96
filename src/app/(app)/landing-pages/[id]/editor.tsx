@@ -67,7 +67,7 @@ export function LandingEditor({
     const path = `${workspaceId}/${crypto.randomUUID()}.${ext}`;
     const supabase = createClient();
     const { error } = await supabase.storage.from("landing-assets").upload(path, file, { contentType: file.type, upsert: false });
-    if (error) return setUpload({ busy: false, error: "Upload failed. Use a PNG, JPG, WebP or SVG under 2 MB." });
+    if (error) return setUpload({ busy: false, error: "Upload failed. Use a PNG, JPG or WebP image under 2 MB." });
     set("logo_url", supabase.storage.from("landing-assets").getPublicUrl(path).data.publicUrl);
     setUpload({ busy: false });
   };
@@ -141,7 +141,7 @@ export function LandingEditor({
                   // eslint-disable-next-line @next/next/no-img-element -- user-uploaded logo
                   <img src={content.logo_url} alt="" className="h-10 max-w-[120px] rounded border border-slate-200 object-contain" />
                 ) : null}
-                <input id="logo" type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml" onChange={(e) => onLogo(e.target.files?.[0])} className="text-sm" />
+                <input id="logo" type="file" accept="image/png,image/jpeg,image/webp" onChange={(e) => onLogo(e.target.files?.[0])} className="text-sm" />
               </div>
               {upload.busy ? <p className="text-xs text-slate-500">Uploading...</p> : null}
               {upload.error ? <p className="text-xs text-red-600">{upload.error}</p> : null}

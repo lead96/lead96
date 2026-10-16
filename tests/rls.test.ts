@@ -813,6 +813,24 @@ describe.skipIf(!configured)("row-level security", () => {
     }
   }, 120_000);
 
+  it("signed-out visitors can't write anything; logos are images only, uploaded by owners into their own folder", async () => {
+    const anon = createClient(url!, anonKey!, { auth: { persistSession: false } });
+    expect((await anon.from("customers").insert({ workspace_id: wsA, full_name: "anon" })).error).not.toBeNull();
+    expect((await anon.from("leads").select("id").limit(1)).data ?? []).toEqual([]);
+    expect((await anon.rpc("create_workspace", { p_name: "anon" })).error).not.toBeNull();
+
+    const png = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+    const svg = new TextEncoder().encode('<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>');
+    const up = (c: SupabaseClient, path: string, body: Uint8Array, type: string) => c.storage.from("landing-assets").upload(path, body, { contentType: type });
+    const own = `${wsA}/sec-${run}.png`;
+    expect((await up(ownerA.client, own, png, "image/png")).error).toBeNull();
+    expect((await up(ownerA.client, `${wsA}/sec-${run}.svg`, svg, "image/svg+xml")).error).not.toBeNull();
+    expect((await up(staffA.client, `${wsA}/staff-${run}.png`, png, "image/png")).error).not.toBeNull();
+    expect((await up(ownerB.client, `${wsA}/other-${run}.png`, png, "image/png")).error).not.toBeNull();
+    expect((await up(anon, `${wsA}/anon-${run}.png`, png, "image/png")).error).not.toBeNull();
+    await admin.storage.from("landing-assets").remove([own]);
+  }, 120_000);
+
   it("ZIP lookup: readable by any signed-in user, not writable, and finds real ZIPs", async () => {
     const miami = await ownerA.client.rpc("zip_city_matches", { p_city: "miami", p_state: "FL" });
     expect(miami.data).toHaveLength(1);
