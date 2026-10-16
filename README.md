@@ -142,6 +142,12 @@ US carriers need each contractor registered as the sender before the AI may text
 
 Row-level security on every table; signed-out visitors have no table rights at all (migration 029, also for future tables). Webhooks and tools are HMAC-signed or keyed (constant-time checks), cron routes need `CRON_SECRET`. Security headers are set in `next.config.ts` (no framing, nosniff, referrer and permissions policy, small CSP; the microphone is allowed for our own pages because of browser test calls). Landing images: PNG / JPEG / WebP only. Review and open items: `docs/09-security-review.md`.
 
+### Two-factor sign-in
+
+Any user can turn on a code from an authenticator app (TOTP, Supabase MFA) under **Settings > Two-factor sign-in**: a QR code / key, then the first code confirms it (`two-factor-actions.ts`). Turning it off needs a current code. After the password, `login` sends them to `/login/verify`; the proxy does the same for any app page opened without a code (`needsSecondFactor()` in `src/lib/supabase/mfa.ts`, read from the session cookie, no network call). The database enforces it from the signed token: `mfa_ok()` (migration 031) is part of `is_member` / `is_owner` / `is_platform_admin` / `shares_workspace`, so a password-only session of a user with two-factor sees no business data, even when calling Supabase directly. A password reset from the email link also asks for the code first. Admin shows a reminder to admins who haven't turned it on.
+
+**Lost phone:** a platform admin deletes the user's factor in the Supabase dashboard (Authentication > Users > the user > MFA factors); they sign in with the password and turn it on again.
+
 ### Change history
 
 Every insert, update and delete on the important tables (businesses, members, invites, customers, leads, calls, texts, landing pages, setup, AI callers, phone numbers, ad accounts, user profiles) is written to `change_log` by a database trigger (`log_change()`, migration 018): who (`auth.uid()`, or "system" for webhooks, jobs and scripts), when, and the old and new values (updates keep only the changed fields). Secrets (invite tokens, webhook keys) and call/text transcripts are left out. The table is append-only (a trigger refuses updates and deletes, even from the service role) and has no foreign key to businesses, so deleting a business keeps the record of what was deleted. Owners read their own business's history; platform admins read everything at **Admin > Change history** (filter by business, what, who).

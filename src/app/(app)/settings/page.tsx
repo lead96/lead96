@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { BUSINESS_TYPES, STATUS_LABELS, type BusinessType, type Registration, type TextingStatus } from "@/lib/texting/registration";
 import { removeMember, revokeInvite } from "./actions";
 import { AutoCallForm, BusinessForm, InviteForm, TextingForm } from "./forms";
+import { TwoFactorCard } from "./two-factor";
 
 export const metadata: Metadata = { title: "Settings" };
 
@@ -33,6 +34,8 @@ export default async function SettingsPage() {
     // Owners only (holds the EIN; RLS hides it from staff too).
     isOwner ? supabase.from("texting_registrations").select("*").eq("workspace_id", workspace.id).maybeSingle() : Promise.resolve({ data: null }),
   ]);
+  const { data: factors } = await supabase.auth.mfa.listFactors();
+  const totp = factors?.totp[0] ?? null;
   const reg = texting as (Registration & { status: TextingStatus; admin_note: string | null }) | null;
   const regEditable = !reg || reg.status === "draft" || reg.status === "rejected";
   const aiReady = Boolean(voice?.retell_agent_id);
@@ -62,6 +65,18 @@ export default async function SettingsPage() {
             calls on the form, stays inside your service area, and never calls anyone who asked not to be called.
           </p>
           {isOwner ? <AutoCallForm on={Boolean(voice?.auto_call)} ready={aiReady} /> : <p className="text-xs text-slate-500">Only owners can change this.</p>}
+        </Card>
+
+        <Card className="p-6">
+          <h2 className="mb-2 font-semibold text-slate-900">Two-factor sign-in</h2>
+          <p className="mb-4 text-sm leading-relaxed text-slate-500">
+            Ask for a code from an authenticator app after your password, so a stolen password alone can&apos;t open your account. Applies to your own
+            sign-in.
+          </p>
+          <TwoFactorCard
+            on={Boolean(totp)}
+            since={totp ? new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric" }).format(new Date(totp.created_at)) : null}
+          />
         </Card>
 
         <Card className="p-6">

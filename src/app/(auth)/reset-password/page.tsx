@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { Field, Input } from "@/components/ui";
 import { getUser } from "@/lib/auth";
+import { needsSecondFactor } from "@/lib/supabase/mfa";
+import { createClient } from "@/lib/supabase/server";
 import { resetPassword } from "../actions";
 import { AuthForm } from "../auth-form";
 
@@ -10,6 +12,8 @@ export const metadata: Metadata = { title: "Choose a new password" };
 export default async function ResetPasswordPage() {
   // Reached through the email link, which signs the user in first.
   if (!(await getUser())) redirect("/forgot-password?expired=1");
+  // With two-factor on, the email link alone is not enough to change the password.
+  if ((await needsSecondFactor(await createClient())).needed) redirect("/login/verify?next=/reset-password");
 
   return (
     <AuthForm title="Choose a new password" action={resetPassword} submitLabel="Save password">

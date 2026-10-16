@@ -4,6 +4,7 @@
  * Skipped when Supabase env vars are missing.
  */
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { createHmac } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -24,6 +25,19 @@ async function makeUser(admin: SupabaseClient, label: string): Promise<TestUser>
   const { error: signInError } = await client.auth.signInWithPassword({ email, password });
   if (signInError) throw signInError;
   return { id: data.user.id, email, client };
+}
+
+/** RFC 6238 code, as an authenticator app computes it (30 s steps, 6 digits, SHA-1). */
+function totp(base32: string, at = Date.now()) {
+  const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
+  let bits = "";
+  for (const ch of base32.replace(/=+$/, "").toUpperCase()) bits += alphabet.indexOf(ch).toString(2).padStart(5, "0");
+  const key = Buffer.from((bits.match(/.{8}/g) ?? []).map((b) => parseInt(b, 2)));
+  const counter = Buffer.alloc(8);
+  counter.writeBigUInt64BE(BigInt(Math.floor(at / 30_000)));
+  const h = createHmac("sha1", key).update(counter).digest();
+  const o = h[h.length - 1] & 0xf;
+  return String((h.readUInt32BE(o) & 0x7fffffff) % 1_000_000).padStart(6, "0");
 }
 
 describe.skipIf(!configured)("row-level security", () => {
@@ -829,6 +843,42 @@ describe.skipIf(!configured)("row-level security", () => {
     expect((await up(ownerB.client, `${wsA}/other-${run}.png`, png, "image/png")).error).not.toBeNull();
     expect((await up(anon, `${wsA}/anon-${run}.png`, png, "image/png")).error).not.toBeNull();
     await admin.storage.from("landing-assets").remove([own]);
+  }, 120_000);
+
+  it("two-factor: once on, a password-only session sees no business data; a code opens it; others unaffected", async () => {
+    const u = await makeUser(admin, "mfa");
+    try {
+      const ws = (await u.client.rpc("create_workspace", { p_name: `MFA ${run}` })).data as string;
+      const read = async (c: SupabaseClient) => (await c.from("workspaces").select("id").eq("id", ws)).data ?? [];
+      expect(await read(u.client)).toHaveLength(1);
+
+      const { data: enrolled, error } = await u.client.auth.mfa.enroll({ factorType: "totp", friendlyName: `t-${run}` });
+      expect(error).toBeNull();
+      // Not confirmed yet: nothing changes.
+      expect(await read(u.client)).toHaveLength(1);
+      expect((await u.client.auth.mfa.challengeAndVerify({ factorId: enrolled!.id, code: "000000" })).error).not.toBeNull();
+      expect((await u.client.auth.mfa.challengeAndVerify({ factorId: enrolled!.id, code: totp(enrolled!.totp.secret) })).error).toBeNull();
+      expect(await read(u.client)).toHaveLength(1); // this session entered the code (aal2)
+
+      // A fresh sign-in with only the password: no data, no admin functions, no profile edits.
+      const fresh = createClient(url!, anonKey!, { auth: { persistSession: false } });
+      await fresh.auth.signInWithPassword({ email: u.email, password });
+      expect(await read(fresh)).toEqual([]);
+      expect((await fresh.rpc("is_member", { ws })).data).toBe(false);
+      expect((await fresh.rpc("mfa_ok")).data).toBe(false);
+      // The code opens it.
+      const factorId = (await fresh.auth.mfa.listFactors()).data!.totp[0].id;
+      expect((await fresh.auth.mfa.challengeAndVerify({ factorId, code: totp(enrolled!.totp.secret) })).error).toBeNull();
+      expect(await read(fresh)).toHaveLength(1);
+      expect((await fresh.rpc("mfa_ok")).data).toBe(true);
+
+      // Users without two-factor are not affected.
+      expect((await ownerA.client.rpc("mfa_ok")).data).toBe(true);
+      expect((await ownerA.client.from("workspaces").select("id").eq("id", wsA)).data).toHaveLength(1);
+      await admin.from("workspaces").delete().eq("id", ws);
+    } finally {
+      await admin.auth.admin.deleteUser(u.id);
+    }
   }, 120_000);
 
   it("ZIP lookup: readable by any signed-in user, not writable, and finds real ZIPs", async () => {

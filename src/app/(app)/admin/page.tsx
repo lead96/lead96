@@ -60,6 +60,8 @@ export default async function AdminPage({ searchParams }: PageProps<"/admin">) {
     );
   }
   const r = report as HealthReport;
+  const { data: factors } = await supabase.auth.mfa.listFactors();
+  const noTwoFactor = !factors?.totp.length;
   const env = serverEnv() as Record<string, unknown>;
   const googleConnected = Boolean(await getConnection());
   const integrations = buildIntegrations(r, (key) => (key === "GOOGLE_ADS_CONNECTION" ? googleConnected : Boolean(env[key])));
@@ -92,6 +94,15 @@ export default async function AdminPage({ searchParams }: PageProps<"/admin">) {
       />
 
       <div className="space-y-8">
+        {noTwoFactor ? (
+          <Alert tone="info">
+            Platform admins can see every business. Turn on two-factor sign-in for your account in{" "}
+            <Link href="/settings" className="font-medium underline">
+              Settings
+            </Link>
+            .
+          </Alert>
+        ) : null}
         <section aria-labelledby="health-h">
           <h2 id="health-h" className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-500">
             Integration health

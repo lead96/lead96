@@ -1,5 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { needsSecondFactor } from "./mfa";
 
 // /invite and /reset-password handle the signed-out case themselves, with a clearer message.
 // /p/* are published landing pages for homeowners. /api/intake/* and /api/cron/* check their own keys.
@@ -39,6 +40,16 @@ export async function updateSession(request: NextRequest) {
     url.pathname = "/login";
     url.search = `?next=${encodeURIComponent(request.nextUrl.pathname + request.nextUrl.search)}`;
     return NextResponse.redirect(url);
+  }
+
+  // Two-factor on but no code entered in this session: send them to the code page.
+  if (signedIn && data?.claims.aal !== "aal2" && !isPublic(request.nextUrl.pathname)) {
+    if ((await needsSecondFactor(supabase)).needed) {
+      const url = request.nextUrl.clone();
+      url.pathname = "/login/verify";
+      url.search = `?next=${encodeURIComponent(request.nextUrl.pathname + request.nextUrl.search)}`;
+      return NextResponse.redirect(url);
+    }
   }
 
   return response;

@@ -2,6 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { z } from "zod";
+import { needsSecondFactor } from "@/lib/supabase/mfa";
 import { createClient } from "@/lib/supabase/server";
 import { publicEnv } from "@/lib/env";
 
@@ -70,6 +71,23 @@ export async function login(_: FormState, formData: FormData): Promise<FormState
   const { error } = await supabase.auth.signInWithPassword(parsed.data);
   if (error) return { error: "Wrong email or password.", fields };
 
+  const next = safeNext(formData.get("next"));
+  // Two-factor turned on: the password alone is not enough (the database enforces it too).
+  if ((await needsSecondFactor(supabase)).needed) redirect(`/login/verify?next=${encodeURIComponent(next)}`);
+  redirect(next);
+}
+
+/** Second sign-in step: the 6-digit code from the authenticator app. */
+export async function verifyTwoFactor(_: FormState, formData: FormData): Promise<FormState> {
+  const code = text(formData, "code").replace(/\s/g, "");
+  if (!/^\d{6}$/.test(code)) return { error: "Enter the 6-digit code from your authenticator app." };
+  const supabase = await createClient();
+  const { data: factors, error: listError } = await supabase.auth.mfa.listFactors();
+  if (listError) redirect("/login");
+  const factor = factors?.totp[0];
+  if (!factor) redirect(safeNext(formData.get("next")));
+  const { error } = await supabase.auth.mfa.challengeAndVerify({ factorId: factor.id, code });
+  if (error) return { error: error.status === 429 ? "Too many tries. Wait a minute and try again." : "That code didn't work. Check the time on your phone and try the newest code." };
   redirect(safeNext(formData.get("next")));
 }
 
