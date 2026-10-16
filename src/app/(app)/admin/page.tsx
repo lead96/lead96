@@ -74,7 +74,7 @@ export default async function AdminPage({ searchParams }: PageProps<"/admin">) {
         title="Admin"
         description="Integration health across all businesses."
         actions={
-          <div className="flex items-center gap-3 text-sm text-slate-500">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-sm text-slate-500">
             <Link href="/admin/businesses" className="font-medium text-brand-700 hover:underline">
               All businesses
             </Link>

@@ -100,8 +100,8 @@ export async function runJob(db: Db, job: Job): Promise<JobOutcome> {
     return { jobId: job.id, result: "deferred", reason: decision.reason };
   }
   if (!decision.ok) {
-    await finishJob(db, job.id, "skipped", { reason: decision.reason });
     await timeline(db, job.workspace_id, job.customer_id, "call.skipped", { reason: decision.reason, trigger: job.trigger });
+    await finishJob(db, job.id, "skipped", { reason: decision.reason });
     return { jobId: job.id, result: "skipped", reason: decision.reason };
   }
 
@@ -149,8 +149,9 @@ export async function runJob(db: Db, job: Job): Promise<JobOutcome> {
   } catch (e) {
     const reason = e instanceof RetellError ? e.message : e instanceof Error ? e.message : "Could not place the call.";
     await db.from("calls").update({ status: "error", error: reason.slice(0, 1000), updated_at: new Date().toISOString() }).eq("id", callRow.id);
-    await finishJob(db, job.id, "failed", { call_id: callRow.id, reason: reason.slice(0, 500) });
+    // Timeline first: whoever sees the job as failed also finds the entry on the customer.
     await timeline(db, job.workspace_id, job.customer_id, "call.failed", { reason: reason.slice(0, 300), trigger: job.trigger });
+    await finishJob(db, job.id, "failed", { call_id: callRow.id, reason: reason.slice(0, 500) });
     return { jobId: job.id, result: "failed", reason };
   }
 }
